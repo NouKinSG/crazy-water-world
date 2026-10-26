@@ -27,6 +27,8 @@ def synth_music(tl):
         i = int(start * SR)
         if i >= n:
             return
+        if i < 0:   # 开始时间在片头之前：只保留落在片内的部分
+            sig, i = sig[-i:], 0
         sig = sig[:n - i]
         out[i:i + len(sig)] += sig
 
