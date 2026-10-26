@@ -38,7 +38,9 @@ const TIERS = [
 ];
 
 // ================= 声音（纯代码合成，无音频文件） =================
-let AC = null, muted = false, noiseBuf = null;
+let AC = null, noiseBuf = null;
+// 声音档位：0 全开，1 关环境音（海浪雨声），2 静音
+let soundMode = +(localStorage.getItem('cww-sound') || 0), muted = soundMode === 2;
 function audioInit() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
@@ -74,20 +76,31 @@ function noise(dur, vol = 0.2, freq = 900) {
 const SFX = {
   throw: () => tone(500, 180, 0.18, 'triangle', 0.08),
   splash: () => noise(0.35, 0.16, 1400),
-  catch: () => { tone(660, 660, 0.08, 'square', 0.05); tone(990, 990, 0.12, 'square', 0.05, 0.07); },
+  catch: () => { tone(660, 660, 0.07, 'triangle', 0.05); tone(990, 990, 0.1, 'triangle', 0.045, 0.06); },
   build: () => { tone(140, 60, 0.18, 'sine', 0.3); noise(0.1, 0.12, 2500); },
-  bite: () => { tone(110, 50, 0.3, 'sawtooth', 0.18); noise(0.2, 0.2, 600); },
-  hit: () => tone(420, 200, 0.1, 'square', 0.06),
-  shot: () => noise(0.08, 0.05, 3000),
-  laser: () => tone(1400, 300, 0.12, 'sawtooth', 0.035),
+  bite: () => { tone(150, 60, 0.22, 'triangle', 0.14); noise(0.14, 0.1, 500); },
+  hit: () => tone(420, 220, 0.08, 'triangle', 0.045),
+  shot: () => noise(0.06, 0.025, 2200),
+  laser: () => tone(900, 380, 0.1, 'triangle', 0.025),
   kill: () => tone(300, 800, 0.2, 'square', 0.06),
   gold: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.25, 'triangle', 0.12, i * 0.09)),
   up: () => [392, 523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.3, 'square', 0.06, i * 0.08)),
-  thunder: () => { noise(1.8, 0.4, 260); tone(60, 30, 1.2, 'sine', 0.25); },
+  thunder: () => { noise(1.6, 0.16, 220); tone(55, 30, 1.0, 'sine', 0.13); },
+  meow: () => { tone(820, 1150, 0.09, 'triangle', 0.05); tone(1150, 650, 0.2, 'triangle', 0.05, 0.09); },
   over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, f * 0.98, 0.35, 'triangle', 0.12, i * 0.18)),
   no: () => tone(200, 150, 0.12, 'square', 0.05),
 };
-function sfx(n) { try { SFX[n] && SFX[n](); } catch (e) {} }
+// 同一种音效短时间内只响一次，避免炮台、自动打捞一多就吵成一片
+const SFX_GAP = { shot: 0.12, laser: 0.12, hit: 0.08, catch: 0.1, splash: 0.15, bite: 0.3, kill: 0.15, throw: 0.08 }, sfxLast = {};
+function sfx(n) {
+  if (!AC || muted) return;
+  const now = AC.currentTime;
+  if (SFX_GAP[n] && now - (sfxLast[n] || -9) < SFX_GAP[n]) return;
+  sfxLast[n] = now;
+  try { SFX[n] && SFX[n](); } catch (e) {}
+}
+// 8-bit 说话声：每个字一声短促的「嘟」
+function blip(freq, vol = 0.035, type = 'square') { tone(freq * rand(0.94, 1.06), freq * rand(0.9, 1.0), 0.05, type, vol); }
 
 // ================= 场景 =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -392,6 +405,11 @@ function makeDebris(type) {
   } else if (type === 'ac') {
     g.add(mesh(new THREE.BoxGeometry(0.6, 0.42, 0.3), mat(0xeceff1), 0, 0, 0));
     const fan = mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 12), mat(0x78909c), 0.1, 0, 0.16); fan.rotation.x = Math.PI / 2; g.add(fan);
+  } else if (type === 'sword') {
+    const gold = mat(0xffc53d, { emissive: 0xffa000, emissiveIntensity: 0.6, metalness: 0.3, roughness: 0.3 });
+    const blade = mesh(new THREE.BoxGeometry(1.1, 0.04, 0.14), mat(0xe8eef2, { emissive: 0x9fd8ff, emissiveIntensity: 0.4, metalness: 0.5, roughness: 0.2 }), 0.2, 0, 0);
+    g.add(blade, mesh(new THREE.BoxGeometry(0.08, 0.08, 0.42), gold, -0.38, 0, 0), mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 6), mat(0x8d3b2a), -0.55, 0, 0).rotateZ(Math.PI / 2), mesh(new THREE.SphereGeometry(0.06, 6, 4), gold, -0.72, 0, 0));
+    const beam = new THREE.Mesh(GEO.beam, BEAM_MAT); beam.position.y = 3; beam.scale.set(0.6, 1, 0.6); g.add(beam);
   } else if (type === 'gold') {
     g.add(mesh(GEO.crate, mat(0xffc53d, { emissive: 0xffa000, emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.3 })));
     g.add(mesh(new THREE.BoxGeometry(0.64, 0.1, 0.64), mat(0x8d6e63), 0, 0.12, 0));

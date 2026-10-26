@@ -13,7 +13,7 @@ function startAmbient() {
     lfo.connect(lfoGain).connect(seaGain.gain);
     sea.connect(seaLp).connect(seaGain).connect(AC.destination);
     const rainSrc = AC.createBufferSource(); rainSrc.buffer = buf; rainSrc.loop = true; rainSrc.playbackRate.value = 1.3;
-    const rainHp = AC.createBiquadFilter(); rainHp.type = 'highpass'; rainHp.frequency.value = 1800;
+    const rainHp = AC.createBiquadFilter(); rainHp.type = 'bandpass'; rainHp.frequency.value = 1400; rainHp.Q.value = 0.5;
     const rainGain = AC.createGain(); rainGain.gain.value = 0;
     rainSrc.connect(rainHp).connect(rainGain).connect(AC.destination);
     sea.start(); lfo.start(); rainSrc.start();
@@ -23,8 +23,9 @@ function startAmbient() {
 function updateAmbient() {
   if (!ambient) return;
   const t = AC.currentTime;
-  ambient.seaGain.gain.setTargetAtTime(muted ? 0 : 0.05 + wStorm * 0.03, t, 0.3);
-  ambient.rainGain.gain.setTargetAtTime(muted ? 0 : wRain * 0.07, t, 0.3);
+  const on = soundMode === 0;
+  ambient.seaGain.gain.setTargetAtTime(on ? 0.035 + wStorm * 0.015 : 0, t, 0.3);
+  ambient.rainGain.gain.setTargetAtTime(on ? wRain * 0.02 : 0, t, 0.3);
 }
 
 // ================= 开场剧情 =================
@@ -76,6 +77,13 @@ const CS_SUBS = [
   [17.2, 19.4, '肥强', '三十年河东，三十年河西……'],
   [19.5, 22.4, '肥强', '我这就去打捞海水过滤器，住进高级庇护所！'],
 ];
+const VOICE = { '旁白': [330, 0.02, 'triangle'], '庇护所老板': [150, 0.035, 'square'], '肥强': [230, 0.035, 'square'], '游艇上的富人': [520, 0.03, 'square'] };
+// 打字机效果：没打出来的字先占位（透明），气泡和字幕的宽度不会跳
+function typeInto(el, full, n) {
+  const k = full + '|' + n; if (el._k === k) return; el._k = k;
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  el.innerHTML = esc(full.slice(0, n)) + '<span style="opacity:0">' + esc(full.slice(n)) + '</span>';
+}
 const WHO_COLOR = { '旁白': 'rgba(255,255,255,.55)', '庇护所老板': '#ff8a80', '肥强': '#FFC53D', '游艇上的富人': '#9be7ff' };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -102,7 +110,7 @@ function endIntro() {
   if (!CS.active) return;
   CS.active = false; scene.remove(CS.group); CS.group = null;
   raft.visible = true; if (mount.g) mount.g.visible = true;
-  $('#cut').classList.remove('show'); $('#cutLine').textContent = ''; $('#cutWho').textContent = '';
+  $('#cut').classList.remove('show'); typeInto($('#cutLine'), '', 0); $('#cutWho').textContent = '';
   const f = CS.onEnd; CS.onEnd = null; f && f();
 }
 $('#cutSkip').onclick = () => { if (CS.active && !CS.skipping) CS.skipping = 0.001; };
@@ -112,8 +120,14 @@ function updateIntro(dt) {
   const t = (CS.t += dt), q = CS.qiang;
   // 字幕
   const sub = CS_SUBS.find(s => t >= s[0] && t < s[1]);
-  setT($('#cutWho'), sub ? sub[2] : ''); setT($('#cutLine'), sub ? sub[3] : '');
-  if (sub) $('#cutWho').style.color = WHO_COLOR[sub[2]];
+  setT($('#cutWho'), sub ? sub[2] : '');
+  if (sub) {
+    $('#cutWho').style.color = WHO_COLOR[sub[2]];
+    const n = Math.min(sub[3].length, Math.floor((t - sub[0]) * 16) + 1);
+    typeInto($('#cutLine'), sub[3], n);
+    if (CS.subKey !== sub[3]) { CS.subKey = sub[3]; CS.typed = 0; }
+    if (n > CS.typed) { const ch = sub[3][n - 1]; if (n % 2 && !/[\s，。？！…、]/.test(ch)) blip(VOICE[sub[2]][0], VOICE[sub[2]][1], VOICE[sub[2]][2]); CS.typed = n; }
+  } else typeInto($('#cutLine'), '', 0);
   // 事件
   csOnce('card', 0.2, () => $('#cutCard').classList.add('show'));
   csOnce('cardOff', 3.6, () => $('#cutCard').classList.remove('show'));
@@ -121,9 +135,9 @@ function updateIntro(dt) {
   csOnce('splash', 12.2, () => { sfx('splash'); puff(V(1.5, 0.2, 2.5), 0xffffff, 14); });
   csOnce('rain', 12.6, () => CS.weather = 'rain');
   csOnce('laugh', 15.2, () => floatText(CS.yacht.position.clone().setY(2.2), '哈哈哈哈哈', '#9be7ff', 1.8));
-  csOnce('storm', 17.2, () => { CS.weather = 'storm'; flash = 1; setTimeout(() => sfx('thunder'), 200); });
+  csOnce('storm', 17.2, () => { CS.weather = 'storm'; flash = 0.6; setTimeout(() => sfx('thunder'), 200); });
   csOnce('punch', 19.0, () => { CS.wall.visible = false; puff(V(3.0, 0.6, 3.0), 0xeef1f3, 26); shake(0.5); sfx('bite'); sfx('hit'); floatText(V(3.0, 1.6, 3.0), '砰！', '#ffffff', 1); });
-  csOnce('flash2', 19.6, () => { flash = 1; setTimeout(() => sfx('thunder'), 250); });
+  csOnce('flash2', 19.6, () => { flash = 0.6; setTimeout(() => sfx('thunder'), 250); });
   csOnce('jump', 20.3, () => sfx('throw'));
   csOnce('title', 22.6, () => { $('#cutTitle').classList.add('show'); sfx('gold'); flash = 0.8; shake(0.4); });
   if (CS.skipping) CS.skipping += dt;
@@ -191,14 +205,14 @@ document.addEventListener('pointerdown', () => { audioInit(); startAmbient(); },
 
 // ================= 肥强头顶台词 =================
 const sayEl = $('#say');
-let sayLeft = 0, sayIdle = 14;
+let sayLeft = 0, sayIdle = 14, sayText = '', sayTyped = 0;
 const sayCd = {};
 const IDLE_LOW = ['三十年河东，三十年河西！', '莫欺中年穷！', '等我住进高级庇护所，看谁还敢踢我！', '老板，你给我等着！', '海水过滤器，我来了！', '三分钟一局，巨爽巨解压！', '今天也是捞垃圾的一天'];
 const IDLE_HIGH = ['当年踢我的老板，现在得叫我强哥', '这豪宅，巨爽巨解压', '游艇都开上了，人生一键重启', '三十年河东，三十年河西，诚不欺我'];
 function qsay(text, dur = 3, important = false) {
   if (!G || idle || G.over) return;
   if (!important && sayLeft > 0.8) return;
-  sayEl.textContent = text; sayEl.classList.add('show'); sayLeft = dur;
+  sayText = text; sayTyped = 0; typeInto(sayEl, text, 0); sayEl.classList.add('show'); sayLeft = dur + text.length / 20;
 }
 function qsayKey(k, cd, lines, important) {
   const now = G ? G.t : 0;
@@ -211,13 +225,18 @@ function updateSay(dt) {
   if (!paused) {
     sayLeft -= dt; sayIdle -= dt;
     if (sayIdle <= 0) {
-      sayIdle = rand(14, 22);
+      sayIdle = rand(20, 30);
       if (G.water < 25 && !counts.filter && !counts.purifier) qsay('渴……得赶紧造个海水过滤器', 3);
       else if (G.food < 25) qsay('饿得前胸贴后背……', 3);
       else { const pool = G.tier >= 3 ? IDLE_HIGH.concat(IDLE_LOW.slice(0, 2)) : IDLE_LOW; qsay(pool[randi(0, pool.length - 1)], 3); }
     }
   }
   if (sayLeft <= 0) { sayEl.classList.remove('show'); return; }
+  if (sayTyped < sayText.length && !paused) {
+    const n = Math.min(sayText.length, sayTyped + Math.max(1, Math.round(dt * 20)));
+    if (n % 3 === 0 && !/[\s，。？！…、]/.test(sayText[n - 1])) blip(240, 0.018);
+    sayTyped = n; typeInto(sayEl, sayText, n);
+  }
   const who = mount.state !== 'dock' ? rider : avatar;
   who.getWorldPosition(_sv); _sv.y += 1.35; _sv.project(camera);
   if (_sv.z > 1) { sayEl.classList.remove('show'); return; }

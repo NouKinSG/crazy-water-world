@@ -131,6 +131,16 @@ canvas{display:block;touch-action:none}
   #cutTitle .t{font-size:36px}#cutTitle .s{font-size:14px}
   #cutSkip{top:2vh;right:10px;height:30px;font-size:12px}
 }
+/* 部署在 Netlify 上时，右下角会有平台加的「Powered by Netlify」角标，底部界面整体让位 */
+body.has-badge #buildBar{bottom:60px}
+body.has-badge #hint{bottom:174px}
+body.has-badge .lb.bot{align-items:flex-start;padding-top:2vh}
+@media (max-width: 760px), (max-height: 520px) {
+  body.has-badge #buildBar{bottom:60px}
+  body.has-badge #resBox{bottom:138px}
+  body.has-badge #hint{bottom:176px}
+  body.has-badge .lb.bot{height:calc(10vh + 56px)}
+}
 @media (max-height: 520px) and (min-width: 600px) {
   #resBox{bottom:84px}#hint{bottom:122px}
 }
@@ -166,7 +176,7 @@ canvas{display:block;touch-action:none}
     <div class="perks">
       <div class="perk panel" data-perk="filter"><div class="ic">💧</div><div class="nm">海水过滤器</div><div class="ds">有了它，高级庇护所随便搬，人生一键重启</div><span class="tag">开局一定要选</span></div>
       <div class="perk panel" data-perk="urine"><div class="ic">🧪</div><div class="nm">尿液过滤器</div><div class="ds">传了三代的祖传老物件，主打自产自销、循环利用</div></div>
-      <div class="perk panel" data-perk="toilet"><div class="ic">🚽</div><div class="nm">黄金马桶</div><div class="ds">看着气派，喝不了水。开局多送 15 废铁 10 木头</div></div>
+      <div class="perk panel" data-perk="toilet"><div class="ic">🚽</div><div class="nm">黄金马桶</div><div class="ds">镇宅之宝：放着稀有物漂来概率翻倍，拆了能卖 40 废铁</div></div>
     </div>
     <button class="linkBtn" id="replayBtn">▶ 看开场剧情</button>
     <div class="howto">你是肥强 · 点海面甩钩 · 点远处肥强坐红色澡盆出海扫货 · 点鲨鱼扎它 · 咬坏的木板点一下就能修<br><span class="mouseOnly">选下面的建筑再点木筏建造 · 拖动转视角 · 滚轮缩放 · 数字键选建筑 · 右键/Esc 取消 · 空格暂停</span><span class="touchOnly">选下面的建筑再点亮起的格子 · 单指拖动转视角 · 双指缩放</span></div>

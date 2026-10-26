@@ -36,6 +36,7 @@ for(const k of ['house','tower','turret','laser','windmill','net','planter','pur
   for(const t of A.tiles.values()) if(!t.b){ A.setSel(k); A.tryPlace(t.x,t.z); break; }
 }
 A.setSel(null); log.push('阿水='+A.npcs.length);
+collect(A.spawnDebris('sword',0)); collect(A.spawnDebris('cat',0)); log.push('尚方宝剑='+!!G.sword+' 哈吉米='+cats.length);
 A.spawnShark(true); for(let k=0;k<1500;k++){ step(0.05); if(G.over) break; }
 log.push('天数='+G.day+' 结束='+G.over);
 const w=G.res.wood; A.setSel('demolish'); const t=[...A.tiles.values()].find(t=>t.b&&t.b.type==='house'); A.onClickWorld({x:t.x,z:t.z}); A.setSel(null);

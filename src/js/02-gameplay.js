@@ -78,13 +78,18 @@ function spawnDebris(type, laneW) {
   g.position.set(d.x, 0, d.z); debris.push(d); return d;
 }
 function removeDebris(d) { scene.remove(d.g); const i = debris.indexOf(d); if (i >= 0) debris.splice(i, 1); }
-function collect(d) {
+function collect(d, quiet) {
   const at = d.g.position.clone(); at.y += 0.8;
   removeDebris(d); G.caught++;
   let txt = '', color = '#fff';
   if (d.type === 'wood') { const n = randi(2, 3); G.res.wood += n; txt = `+${n} 🪵`; }
   else if (d.type === 'plastic') { const n = randi(2, 3); G.res.plastic += n; txt = `+${n} 🧴`; }
   else if (d.type === 'scrap') { const n = randi(1, 2); G.res.scrap += n; txt = `+${n} ⚙️`; }
+  else if (d.type === 'sword') {
+    if (!G.sword) { G.sword = true; txt = '尚方宝剑！'; banner('捞到尚方宝剑！', '扎鲨鱼伤害永久翻倍'); qsay('尚方宝剑在手，鲨鱼先斩后奏！', 3.5, true); }
+    else { G.res.scrap += 20; txt = '又一把？熔了 +20 ⚙️'; }
+    color = '#FFC53D'; sfx('gold'); quiet = false;
+  }
   else if (d.type === 'ac') { G.res.scrap += 4; txt = '空调外机，拆了 +4 ⚙️'; color = '#cfd8dc'; }
   else if (d.type === 'goldbar') { G.res.scrap += 30; G.res.plastic += 10; txt = '+30 ⚙️ +10 🧴'; color = '#FFC53D'; banner('验货：黄金棒！', '还不错，价值一把尚方宝剑'); sfx('gold'); qsay('价值一把尚方宝剑！发了发了！', 3, true); }
   else if (d.type === 'cat') {
@@ -101,7 +106,8 @@ function collect(d) {
     banner('捞到海水过滤器了！', '三十年河东，三十年河西 · 已放进建造栏'); sfx('gold'); qsay('哈哈哈！海水过滤器！我肥强也有今天！', 3.5, true);
     if (!sel) setSel('filter');
   }
-  floatText(at, txt, color); sfx('catch');
+  if (['goldbar', 'cat', 'gold'].includes(d.type)) quiet = false;
+  if (!quiet) { floatText(at, txt, color); sfx('catch'); }
 }
 
 // ---------- 钩子 ----------
@@ -146,7 +152,7 @@ function updateHooks(dt) {
     }
     if (h.state === 'reel' && h.target) { h.target.g.position.copy(p); h.target.x = p.x; h.target.z = p.z; }
     if (h.state === 'reel' && h.t >= 1) {
-      if (h.target) collect(h.target);
+      if (h.target) collect(h.target, !h.player);
       if (h.obj) scene.remove(h.obj);
       if (h.line) { scene.remove(h.line); h.line.geometry.dispose(); }
       if (h.player) playerHook = null;
@@ -165,10 +171,10 @@ function spawnShark(boss, delayR = 0) {
   s.g.position.set(s.x, -0.3, s.z); scene.add(s.g); sharks.push(s); return s;
 }
 function sharkDesiredR(s) { return raftR + (s.boss ? 5 : 3); }
-function damageShark(s, dmg) {
+function damageShark(s, dmg, show) {
   if (s.dead) return;
   s.hp -= dmg; s.flash = 0.15; sfx('hit');
-  floatText(new THREE.Vector3(s.x, 1.2, s.z), '-' + dmg, '#ff8a80');
+  if (show) floatText(new THREE.Vector3(s.x, 1.2, s.z), '-' + dmg, '#ff8a80');
   if (s.hp <= 0) {
     s.dead = true; G.kills++; sfx('kill'); s.bar.visible = false;
     if (s.boss) qsay('深海巨兽？就这？', 3, true); else qsayKey('kill', 8, ['就这？', '晚饭有着落了！', '还有谁！']);
@@ -196,7 +202,7 @@ function updateSharks(dt) {
       if (s.timer <= 0 && tiles.size && s.r < sharkDesiredR(s) + 2) {
         const edges = [...tiles.values()].filter(isEdge);
         s.target = edges.sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z))[randi(0, Math.min(2, edges.length - 1))];
-        s.state = 'attack';
+        s.state = 'attack'; catWarn(s);
       }
     } else if (s.state === 'attack') {
       if (!s.target || !tiles.has(key(s.target.x, s.target.z))) { s.state = 'retreat'; continue; }
@@ -293,7 +299,7 @@ function playerSpear(s) {
   if (Math.hypot(s.x - t.x, s.z - t.z) > 16) { hint('太远了，等它游近点再扎', true); return; }
   spearCd = 0.4; avatarTo.set(t.x, 0, t.z); avatar.rotation.y = Math.atan2(s.x - t.x, s.z - t.z);
   beam(tileWorld(t, 0.9), new THREE.Vector3(s.x, 0.3, s.z), 0xffc53d);
-  damageShark(s, G.perk === 'spear' ? 2 : 1);
+  damageShark(s, G.sword || G.perk === 'spear' ? 2 : 1, true);
 }
 function tryRepair(t) {
   const mx = tileMaxHp(); if (t.hp >= mx) return false;
@@ -375,15 +381,19 @@ function gameUpdate(dt) {
 
   const n = survivors();
   G.water = clamp(G.water + (counts.urine * 0.4 + counts.filter * 0.8 + counts.purifier * 2.5 - (0.55 + 0.07 * n)) * dt, 0, 100);
-  G.food = clamp(G.food + (counts.grill * 0.5 + counts.planter * 0.9 - (0.38 + 0.05 * n)) * dt, 0, 100);
+  G.food = clamp(G.food + (counts.grill * 0.5 + counts.planter * 0.9 + cats.length * 0.12 - (0.38 + 0.05 * n)) * dt, 0, 100);
   if (G.water <= 0 || G.food <= 0) G.hp -= 3 * dt; else G.hp = Math.min(100, G.hp + 1.5 * dt);
   if (G.hp <= 0) { G.hp = 0; return gameOver(G.water <= 0 ? '渴死了，下次先造海水过滤器' : '饿死了，下次多造烤鱼架'); }
 
   spawnTimer -= dt;
   if (spawnTimer <= 0 && debris.length < 40) {
-    spawnTimer = 1.25 / (1 + 0.22 * G.tier) / (counts.lighthouse ? 1.5 : 1);
-    const r = Math.random();
-    spawnDebris(r < 0.012 ? 'gold' : r < 0.027 ? 'goldbar' : r < 0.042 && G.t > 30 ? 'cat' : pickType());
+    const lh = counts.lighthouse ? 1.5 + 0.15 * (counts.lighthouse - 1) : 1;
+    spawnTimer = 1.25 / (1 + 0.22 * G.tier) / lh;
+    // 黄金马桶镇宅：稀有物概率翻倍
+    const r = Math.random(), L = counts.toilet ? 2 : 1;
+    let ty = pickType();
+    if (r < 0.012 * L) ty = 'gold'; else if (r < 0.027 * L) ty = 'goldbar'; else if (r < 0.035 * L && !G.sword && G.t > 20) ty = 'sword'; else if (r < 0.05 * L && G.t > 30) ty = 'cat';
+    spawnDebris(ty);
   }
   if (!G.filtersFound && G.t > 18 && !debris.some(d => d.type === 'gold')) spawnDebris('gold', 2);
 
@@ -414,6 +424,7 @@ function tryDemolish(x, z) {
     removeBuilding(t);
     if (type === 'filter' && free) { G.freeFilter++; txt = '退回 海水过滤器 ×1'; }
     else if (DEFS[type]) { Object.entries(DEFS[type].cost).forEach(([r, n]) => G.res[r] += n); txt = '返还 ' + costText(DEFS[type].cost); }
+    else if (type === 'toilet') { G.res.scrap += 40; txt = '黄金马桶卖了 +40 ⚙️'; }
     else txt = '拆了';
   } else {
     if (tiles.size <= 1) { hint('最后一块木板可不能拆', true); sfx('no'); return; }
@@ -452,6 +463,14 @@ function addCat() {
   const g = makeCat(), t = freeTile(); if (!t) return;
   g.position.set(t.x, 0.3, t.z); raft.add(g);
   cats.push({ g, to: new THREE.Vector3(t.x, 0.3, t.z), wait: rand(1, 3), meow: rand(6, 14) });
+}
+// 鲨鱼扑过来咬木板时，哈吉米喵一声提醒
+let catWarnAt = -99;
+function catWarn(s) {
+  if (!cats.length || G.t - catWarnAt < 6) return;
+  catWarnAt = G.t;
+  const c = cats[randi(0, cats.length - 1)];
+  floatText(c.g.position.clone().add(new THREE.Vector3(0, raft.position.y + 0.7, 0)), '喵！鲨鱼来了', '#f4a340', 1.6); sfx('meow');
 }
 function updateCats(dt) {
   cats.forEach(c => {

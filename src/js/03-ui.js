@@ -228,7 +228,11 @@ function updateGhost() {
 }
 function togglePause() { paused = !paused; $('#paused').style.display = paused ? 'block' : 'none'; $('#pauseBtn').textContent = paused ? '▶' : '⏸'; }
 $('#pauseBtn').onclick = togglePause;
-$('#muteBtn').onclick = () => { muted = !muted; $('#muteBtn').textContent = muted ? '🔇' : '🔊'; };
+const SOUND_UI = [['🔊', '声音全开'], ['🔉', '已关海浪雨声，保留音效'], ['🔇', '已静音']];
+function applySound() { muted = soundMode === 2; $('#muteBtn').textContent = SOUND_UI[soundMode][0]; $('#muteBtn').title = SOUND_UI[soundMode][1]; }
+$('#muteBtn').onclick = () => { soundMode = (soundMode + 1) % 3; localStorage.setItem('cww-sound', soundMode); applySound(); hint(SOUND_UI[soundMode][1]); hintLock = 1.5; };
+applySound();
+if (/netlify\.app$/.test(location.hostname)) document.body.classList.add('has-badge');
 addEventListener('resize', () => { fitCamera(); renderer.setSize(innerWidth, innerHeight); });
 
 // ================= 昼夜 =================
@@ -240,7 +244,7 @@ function updateWeather(dt) {
   flash = Math.max(0, flash - dt * 3);
   if (wStorm > 0.8 && !paused) {
     boltTimer -= dt;
-    if (boltTimer <= 0) { boltTimer = rand(4, 10); flash = 1; setTimeout(() => sfx('thunder'), rand(150, 600)); }
+    if (boltTimer <= 0) { boltTimer = rand(6, 12); flash = 0.55; setTimeout(() => sfx('thunder'), rand(150, 600)); }
   }
   updateRain(dt, wRain, cam.tx, cam.tz);
 }
@@ -280,7 +284,7 @@ function resetWorld() {
 }
 function begin() {
   idle = false;
-  recount(); cam.tx = raftC.x; cam.tz = raftC.z;
+  recount(); cam.tx = raftC.x; cam.tz = raftC.z; if (innerWidth < innerHeight) cam.zoom = 0.8;
   avatarTo.set(raftC.x, 0, raftC.z); avatar.position.copy(avatarTo);
   setMount(); mount.pos.copy(dockPos()); recount();
   for (let i = 0; i < (G.cats || 0); i++) addCat();
@@ -296,7 +300,7 @@ function newGame(perk) {
   if (perk === 'toilet') { placeBuilding(tiles.get(key(1, 1)), 'toilet'); G.res.scrap += 15; G.res.wood += 10; }
   begin(); banner('疯狂水世界，启动！', '三分钟一局，巨爽巨解压'); jumpT = 1.1; sayIdle = 14;
   setTimeout(() => G && !G.over && qsay('老板你等着，我一定会回来的！', 3.5, true), 2600);
-  floatText(new THREE.Vector3(raftC.x, 1.8, raftC.z), '疯狂水世界，启动！', '#FFC53D', 2); save();
+  save();
 }
 function loadGame(data) {
   resetWorld(); G = data.G; G.over = false;
