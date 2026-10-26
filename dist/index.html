@@ -92,6 +92,19 @@ canvas{display:block;touch-action:none}
 #cutSkip{position:absolute;right:24px;top:3.5vh;pointer-events:auto;height:36px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:var(--text);font-size:14px;font-weight:700;cursor:pointer}
 #cutFade{position:absolute;inset:0;background:#0b0f14;opacity:0;transition:opacity .5s}
 .linkBtn{margin-top:18px;background:none;border:0;color:var(--t2);font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+#help{z-index:30}
+#help .helpBox{width:min(580px,94vw);max-height:88vh;overflow-y:auto;padding:18px 20px 20px;text-align:left;background:rgba(16,24,34,.92)}
+.helpHead{display:flex;justify-content:space-between;align-items:center}.helpHead h3{font-size:20px;font-weight:800}
+.helpTabs,.seg{display:flex;gap:6px}.helpTabs{margin:14px 0 8px}
+.helpTabs button,.seg button{flex:1;height:34px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--t2);font-size:13px;font-weight:700;cursor:pointer}
+.helpTabs button.on,.seg button.on{background:rgba(255,197,61,.14);border-color:var(--accent);color:var(--text)}
+table.keys{width:100%;border-collapse:collapse;font-size:13px;line-height:1.45}
+table.keys td{padding:7px 4px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--t2)}
+table.keys td:first-child{color:var(--accent);font-weight:700;width:44%}
+#help h4{font-size:12px;color:var(--t3);font-weight:700;margin:18px 0 8px;letter-spacing:1px}
+ul.tips{padding-left:18px;font-size:13px;color:var(--t2);line-height:1.75}ul.tips b{color:var(--text)}
+.helpActions{display:flex;gap:8px;margin-top:16px}.helpActions .ghostBtn{flex:1;margin:0;height:36px;font-size:13px;padding:0 8px}
+#help .primary{margin-top:12px}
 .corner{position:fixed;left:20px;bottom:16px;font-size:11px;color:var(--t3)}
 /* ---------- 手机 / 小屏 ---------- */
 @media (max-width: 760px), (max-height: 520px) {
@@ -130,6 +143,9 @@ canvas{display:block;touch-action:none}
   #cutCard{font-size:24px;letter-spacing:3px;white-space:nowrap}
   #cutTitle .t{font-size:36px}#cutTitle .s{font-size:14px}
   #cutSkip{top:2vh;right:10px;height:30px;font-size:12px}
+  #help{align-items:flex-end}
+  #help .helpBox{width:100vw;max-height:86vh;border-radius:16px 16px 0 0;padding:14px 14px 18px}
+  table.keys{font-size:12px}table.keys td:first-child{width:46%}ul.tips{font-size:12px}
 }
 /* 部署在 Netlify 上时，右下角会有平台加的「Powered by Netlify」角标，底部界面整体让位 */
 body.has-badge #buildBar{bottom:60px}
@@ -157,7 +173,7 @@ body.has-badge .lb.bot{align-items:flex-start;padding-top:2vh}
     <div class="bar" id="bh"><div class="lbl"><span>❤️ 生命</span><span class="v">100</span></div><div class="track"><div class="fill"></div></div></div>
   </div>
   <div id="resBox" class="panel"></div>
-  <div id="topR"><button class="iconBtn" id="muteBtn" title="声音">🔊</button><button class="iconBtn" id="pauseBtn" title="暂停 (空格)">⏸</button></div>
+  <div id="topR"><button class="iconBtn" id="helpBtn" title="设置与玩法 (H)">⚙️</button><button class="iconBtn" id="muteBtn" title="声音">🔊</button><button class="iconBtn" id="pauseBtn" title="暂停 (空格)">⏸</button></div>
   <div id="upBox" class="panel"></div>
   <div id="hint">点海面甩钩，把漂过来的东西捞上来</div>
   <div id="buildBar" class="panel"></div>
@@ -179,7 +195,7 @@ body.has-badge .lb.bot{align-items:flex-start;padding-top:2vh}
       <div class="perk panel" data-perk="toilet"><div class="ic">🚽</div><div class="nm">黄金马桶</div><div class="ds">镇宅之宝：放着稀有物漂来概率翻倍，拆了能卖 40 废铁</div></div>
     </div>
     <button class="linkBtn" id="replayBtn">▶ 看开场剧情</button>
-    <div class="howto">你是肥强 · 点海面甩钩 · 点远处肥强坐红色澡盆出海扫货 · 点鲨鱼扎它 · 咬坏的木板点一下就能修<br><span class="mouseOnly">选下面的建筑再点木筏建造 · 拖动转视角 · 滚轮缩放 · 数字键选建筑 · 右键/Esc 取消 · 空格暂停</span><span class="touchOnly">选下面的建筑再点亮起的格子 · 单指拖动转视角 · 双指缩放</span></div>
+    <div class="howto">你是肥强 · 点海面甩钩 · 点远处肥强坐红色澡盆出海扫货 · 点鲨鱼扎它 · 咬坏的木板点一下就能修<br><span class="mouseOnly">选下面的建筑再点木筏建造 · 右键拖动或 Q / E 转视角 · 滚轮缩放 · 数字键选建筑 · 右键单击/Esc 取消 · 空格暂停</span><span class="touchOnly">选下面的建筑再点亮起的格子 · 单指拖动转视角 · 双指缩放</span></div>
   </div>
   <div class="corner">单机网页版 · 进度自动保存在这台电脑的浏览器里 · No more fake ads</div>
 </div>
@@ -190,6 +206,21 @@ body.has-badge .lb.bot{align-items:flex-start;padding-top:2vh}
     <div class="sub" id="overSub">木筏被鲨鱼啃光了</div>
     <div class="stats" id="overStats"></div>
     <button class="primary" id="overBtn">再来一局</button>
+  </div>
+</div>
+
+<div id="help" class="overlay">
+  <div class="helpBox panel">
+    <div class="helpHead"><h3>设置与玩法</h3><button class="iconBtn" id="helpClose" title="关闭">✕</button></div>
+    <div class="helpTabs"><button data-tab="pc">电脑操作</button><button data-tab="mobile">手机操作</button></div>
+    <table class="keys" data-for="pc"><tr><td>左键点海面</td><td>甩钩，把漂过来的东西捞上来</td></tr><tr><td>左键点钩子够不着的远处</td><td>肥强坐澡盆出海，沿路扫货</td></tr><tr><td>左键点鲨鱼</td><td>扎它</td></tr><tr><td>左键点咬坏的木板</td><td>修好（花 1 木材，升级后花 1 废铁）</td></tr><tr><td>点下面的建筑卡片 / 数字键 1–9</td><td>选中建筑，再左键点木筏放下</td></tr><tr><td>「🔨 拆除」/ 数字键 0</td><td>点建筑或地板拆掉，全额返还</td></tr><tr><td>按住右键拖动 / Q E</td><td>转视角</td></tr><tr><td>滚轮</td><td>缩放</td></tr><tr><td>右键单击 / Esc</td><td>取消建造</td></tr><tr><td>空格</td><td>暂停</td></tr><tr><td>H</td><td>打开这个面板</td></tr></table>
+    <table class="keys" data-for="mobile"><tr><td>点海面</td><td>甩钩，把漂过来的东西捞上来</td></tr><tr><td>点钩子够不着的远处</td><td>肥强坐澡盆出海，沿路扫货</td></tr><tr><td>点鲨鱼</td><td>扎它</td></tr><tr><td>点咬坏的木板</td><td>修好（花 1 木材，升级后花 1 废铁）</td></tr><tr><td>点下面的建筑卡片</td><td>能放的格子会亮起，点一下就建好</td></tr><tr><td>「🔨 拆除」</td><td>木板变红，点哪拆哪，全额返还</td></tr><tr><td>单指拖动</td><td>转视角</td></tr><tr><td>双指捏合 / 张开</td><td>缩放</td></tr><tr><td>点提示条上的 ✕</td><td>取消建造</td></tr><tr><td>右上角 ⏸</td><td>暂停</td></tr></table>
+    <h4>怎么玩</h4>
+    <ul class="tips"><li>淡水和食物会一直往下掉，见底就掉血：先造<b>海水过滤器</b>和<b>烤鱼架</b></li><li>天黑以后鲨鱼会来咬木板：点它扎它，或者造<b>鱼叉炮台</b>自动打；咬坏的木板点一下就能修</li><li>木筏格数和材料攒够了，点右上角<b>升级庇护所</b>，解锁新建筑和更快的坐骑</li><li><b>集装箱房</b>和<b>海景豪宅</b>会住进阿水们，他们会自动帮你甩钩</li><li>留意发金光的东西：箱子里是<b>海水过滤器</b>，还有<b>尚方宝剑</b>（扎鲨鱼伤害翻倍）、<b>黄金棒</b>、纸箱里的<b>哈吉米</b></li><li>进度每 5 秒自动保存在这台设备的浏览器里，关掉网页下次点「继续上次」</li></ul>
+    <h4>声音</h4>
+    <div class="seg" id="soundSeg"><button data-v="0">🔊 全开</button><button data-v="1">🔉 关海浪雨声</button><button data-v="2">🔇 静音</button></div>
+    <div class="helpActions"><button class="ghostBtn" id="helpReplay">▶ 看开场剧情</button><button class="ghostBtn" id="helpHome">回到开始画面</button></div>
+    <button class="primary" id="helpOk">知道了，继续玩</button>
   </div>
 </div>
 
@@ -1554,16 +1585,29 @@ let down = null, hover = null, pinch = null;
 const ptrs = new Map();
 const ptrDist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+// 电脑：左键只负责点（按下即生效，连点不会误转视角），右键/中键按住拖动转视角，右键单击取消建造
+// 手机：单指点按、单指拖动转视角、双指缩放
+let rot = null, dragHinted = false;
 canvas.addEventListener('pointerdown', e => {
   audioInit();
-  if (e.button === 2) { setSel(null); return; }
+  if (e.pointerType === 'mouse') {
+    if (e.button === 0) { onClick(e.clientX, e.clientY); down = { x: e.clientX, y: e.clientY, mouse: true }; }
+    else if (e.button === 1 || e.button === 2) { e.preventDefault(); rot = { x: e.clientX, theta: cam.theta, moved: false, btn: e.button }; }
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    return;
+  }
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   if (ptrs.size === 2) { pinch = { d: ptrDist(), zoom: cam.zoom }; if (down) down.moved = true; return; }
   down = { x: e.clientX, y: e.clientY, theta: cam.theta, moved: false, touch: e.pointerType === 'touch' };
 });
 canvas.addEventListener('pointermove', e => {
-  if (e.pointerType === 'mouse') hover = { x: e.clientX, y: e.clientY };
+  if (e.pointerType === 'mouse') {
+    hover = { x: e.clientX, y: e.clientY };
+    if (rot) { const dx = e.clientX - rot.x; if (Math.abs(dx) > 4) rot.moved = true; if (rot.moved) cam.theta = rot.theta - dx * 0.006; }
+    else if (down && !dragHinted && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 60) { dragHinted = true; hint('按住鼠标右键拖动可以转视角，Q / E 也行'); hintLock = 3; }
+    return;
+  }
   if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pinch && ptrs.size >= 2) { cam.zoom = clamp(pinch.zoom * pinch.d / ptrDist(), 0.45, 1.8); return; }
   if (down) {
@@ -1573,6 +1617,11 @@ canvas.addEventListener('pointermove', e => {
   }
 });
 function ptrEnd(e, cancel) {
+  if (e.pointerType === 'mouse') {
+    if (rot && e.button === rot.btn) { if (!rot.moved && rot.btn === 2) setSel(null); rot = null; }
+    if (e.button === 0) down = null;
+    return;
+  }
   ptrs.delete(e.pointerId);
   if (ptrs.size < 2) pinch = null;
   if (!cancel && down && !down.moved && ptrs.size === 0) onClick(e.clientX, e.clientY);
@@ -1582,9 +1631,13 @@ canvas.addEventListener('pointerup', e => ptrEnd(e, false));
 canvas.addEventListener('pointercancel', e => ptrEnd(e, true));
 canvas.addEventListener('wheel', e => { e.preventDefault(); cam.zoom = clamp(cam.zoom * (1 + e.deltaY * 0.001), 0.45, 1.8); }, { passive: false });
 addEventListener('keydown', e => {
-  if (!G || G.over) return;
+  if ($('#help').classList.contains('show')) { if (e.key === 'Escape') closeHelp(); return; }
+  if (!G || G.over || idle) return;
+  if (e.key === 'h' || e.key === 'H' || e.key === '?') { openHelp(); return; }
   if (e.key === 'Escape') setSel(null);
   else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+  else if (e.key === 'q' || e.key === 'Q') cam.theta += 0.35;
+  else if (e.key === 'e' || e.key === 'E') cam.theta -= 0.35;
   else if (e.key === '0') setSel(sel === 'demolish' ? null : 'demolish');
   else if (/^[1-9]$/.test(e.key)) { const ks = ORDER.filter(unlocked), k = ks[+e.key - 1]; if (k) setSel(sel === k ? null : k); }
 });
@@ -1592,11 +1645,23 @@ function onClick(cx, cy) {
   if (!G || G.over || paused) return;
   const p = groundAt(cx, cy); if (p) clickAt(p);
 }
-function clickAt(p) {
-  if (sel === 'demolish') { tryDemolish(Math.round(p.x), Math.round(p.z)); return; }
-  if (sel) { tryPlace(Math.round(p.x), Math.round(p.z)); return; }
+function sharkAt(p) {
   let best = null, bd = 1e9;
   sharks.forEach(s => { if (s.dead) return; const d = Math.hypot(s.x - p.x, s.z - p.z); if (d < (s.boss ? 3 : 1.6) && d < bd) { bd = d; best = s; } });
+  return best;
+}
+function clickAt(p) {
+  const cx = Math.round(p.x), cz = Math.round(p.z);
+  if (sel === 'demolish') { tryDemolish(cx, cz); return; }
+  if (sel) {
+    // 建造模式里也能修木板、扎鲨鱼：咬坏的木板先修，能放就放，点到鲨鱼就扎
+    const bt = tiles.get(key(cx, cz));
+    if (bt && bt.hp < tileMaxHp()) { tryRepair(bt); return; }
+    if (validPlace(sel, cx, cz)) { tryPlace(cx, cz); return; }
+    const sk = sharkAt(p); if (sk) return playerSpear(sk);
+    tryPlace(cx, cz); return;
+  }
+  const best = sharkAt(p);
   if (best) return playerSpear(best);
   const t = tiles.get(key(Math.round(p.x), Math.round(p.z)));
   if (t) { if (!tryRepair(t)) hint('点海面甩钩，点鲨鱼扎它'); return; }
@@ -1639,7 +1704,35 @@ function updateGhost() {
 function togglePause() { paused = !paused; $('#paused').style.display = paused ? 'block' : 'none'; $('#pauseBtn').textContent = paused ? '▶' : '⏸'; }
 $('#pauseBtn').onclick = togglePause;
 const SOUND_UI = [['🔊', '声音全开'], ['🔉', '已关海浪雨声，保留音效'], ['🔇', '已静音']];
-function applySound() { muted = soundMode === 2; $('#muteBtn').textContent = SOUND_UI[soundMode][0]; $('#muteBtn').title = SOUND_UI[soundMode][1]; }
+function applySound() {
+  muted = soundMode === 2; $('#muteBtn').textContent = SOUND_UI[soundMode][0]; $('#muteBtn').title = SOUND_UI[soundMode][1];
+  document.querySelectorAll('#soundSeg button').forEach(b => b.classList.toggle('on', +b.dataset.v === soundMode));
+}
+// ---------- 设置与玩法说明 ----------
+let helpPausedBefore = false;
+function helpTab(t) {
+  document.querySelectorAll('.helpTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('table.keys').forEach(tb => tb.style.display = tb.dataset.for === t ? '' : 'none');
+}
+function openHelp() {
+  if ($('#help').classList.contains('show')) return;
+  helpPausedBefore = paused; if (!paused && G && !idle) togglePause();
+  $('#paused').style.display = 'none';
+  helpTab(IS_TOUCH ? 'mobile' : 'pc'); applySound();
+  $('#help').classList.add('show');
+}
+function closeHelp() {
+  if (!$('#help').classList.contains('show')) return;
+  $('#help').classList.remove('show');
+  if (paused && !helpPausedBefore) togglePause(); else if (paused) $('#paused').style.display = 'block';
+}
+$('#helpBtn').onclick = openHelp;
+$('#helpOk').onclick = $('#helpClose').onclick = closeHelp;
+$('#help').addEventListener('click', e => { if (e.target.id === 'help') closeHelp(); });
+document.querySelectorAll('.helpTabs button').forEach(b => b.onclick = () => helpTab(b.dataset.tab));
+document.querySelectorAll('#soundSeg button').forEach(b => b.onclick = () => { soundMode = +b.dataset.v; localStorage.setItem('cww-sound', soundMode); audioInit(); applySound(); });
+$('#helpReplay').onclick = () => { $('#help').classList.remove('show'); playIntro(() => { $('#hud').style.display = ''; if (paused) togglePause(); }); };
+$('#helpHome').onclick = () => { $('#help').classList.remove('show'); save(); if (!paused) togglePause(); showStart(); };
 $('#muteBtn').onclick = () => { soundMode = (soundMode + 1) % 3; localStorage.setItem('cww-sound', soundMode); applySound(); hint(SOUND_UI[soundMode][1]); hintLock = 1.5; };
 applySound();
 if (/netlify\.app$/.test(location.hostname)) document.body.classList.add('has-badge');
@@ -1709,6 +1802,7 @@ function newGame(perk) {
   if (perk === 'urine') placeBuilding(tiles.get(key(1, 1)), 'urine');
   if (perk === 'toilet') { placeBuilding(tiles.get(key(1, 1)), 'toilet'); G.res.scrap += 15; G.res.wood += 10; }
   begin(); banner('疯狂水世界，启动！', '三分钟一局，巨爽巨解压'); jumpT = 1.1; sayIdle = 14;
+  if (!localStorage.getItem('cww-help-seen')) { localStorage.setItem('cww-help-seen', '1'); setTimeout(() => G && !G.over && openHelp(), 1800); }
   setTimeout(() => G && !G.over && qsay('老板你等着，我一定会回来的！', 3.5, true), 2600);
   save();
 }

@@ -32,6 +32,17 @@ A.newGame('filter'); const G=A.G; G.res.wood=G.res.plastic=G.res.scrap=999;
 for(let k=0;k<40;k++) step(0.05);
 A.onClickWorld({x:A.raftC.x+22,z:A.raftC.z+3}); for(let k=0;k<400;k++) step(0.05);
 log.push('坐骑回港='+(A.mount.state==='dock'));
+// 鼠标：左键按下即甩钩、拖动不转视角；右键拖动转视角；右键单击取消建造；Q 键转视角
+const cv=document.querySelector('canvas'), pe=(t,b,x,y)=>cv.dispatchEvent(new PointerEvent(t,{pointerId:1,button:b,clientX:x,clientY:y,pointerType:'mouse',bubbles:true}));
+const th0=cam.theta, hk0=A.hooks.length; pe('pointerdown',0,innerWidth*0.7,innerHeight*0.5); pe('pointermove',-1,innerWidth*0.7+80,innerHeight*0.5); pe('pointerup',0,innerWidth*0.7+80,innerHeight*0.5);
+const leftOk=A.hooks.length>hk0 && cam.theta===th0;
+pe('pointerdown',2,500,400); pe('pointermove',-1,620,400); pe('pointerup',2,620,400); const rightRot=cam.theta!==th0;
+A.setSel('floor'); pe('pointerdown',2,500,400); pe('pointerup',2,500,400); const cancelOk=sel===null;
+const th1=cam.theta; window.dispatchEvent(new KeyboardEvent('keydown',{key:'q'})); const qOk=cam.theta!==th1;
+for(let k=0;k<60;k++) step(0.05);
+{ const bt=[...A.tiles.values()][0]; bt.hp=1; A.setSel('grill'); A.onClickWorld({x:bt.x,z:bt.z}); log.push('建造中修木板='+(bt.hp===tileMaxHp())); A.setSel(null); }
+openHelp(); const hp1=paused&&document.querySelector('#help').classList.contains('show'); closeHelp(); log.push('设置面板 打开暂停='+hp1+' 关闭继续='+!paused);
+log.push('鼠标 左键点且不转='+leftOk+' 右键拖转='+rightRot+' 右键取消='+cancelOk+' Q转='+qOk);
 A.setSel('floor'); for(let r=0;r<4;r++)for(let x=-3;x<=4;x++)for(let z=-3;z<=4;z++) A.tryPlace(x,z);
 for(let i=0;i<4;i++) A.upgrade(); log.push('等级='+G.tier);
 for(const k of ['house','tower','turret','laser','windmill','net','planter','purifier','lighthouse']){

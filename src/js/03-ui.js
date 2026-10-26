@@ -144,16 +144,29 @@ let down = null, hover = null, pinch = null;
 const ptrs = new Map();
 const ptrDist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+// 电脑：左键只负责点（按下即生效，连点不会误转视角），右键/中键按住拖动转视角，右键单击取消建造
+// 手机：单指点按、单指拖动转视角、双指缩放
+let rot = null, dragHinted = false;
 canvas.addEventListener('pointerdown', e => {
   audioInit();
-  if (e.button === 2) { setSel(null); return; }
+  if (e.pointerType === 'mouse') {
+    if (e.button === 0) { onClick(e.clientX, e.clientY); down = { x: e.clientX, y: e.clientY, mouse: true }; }
+    else if (e.button === 1 || e.button === 2) { e.preventDefault(); rot = { x: e.clientX, theta: cam.theta, moved: false, btn: e.button }; }
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    return;
+  }
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   if (ptrs.size === 2) { pinch = { d: ptrDist(), zoom: cam.zoom }; if (down) down.moved = true; return; }
   down = { x: e.clientX, y: e.clientY, theta: cam.theta, moved: false, touch: e.pointerType === 'touch' };
 });
 canvas.addEventListener('pointermove', e => {
-  if (e.pointerType === 'mouse') hover = { x: e.clientX, y: e.clientY };
+  if (e.pointerType === 'mouse') {
+    hover = { x: e.clientX, y: e.clientY };
+    if (rot) { const dx = e.clientX - rot.x; if (Math.abs(dx) > 4) rot.moved = true; if (rot.moved) cam.theta = rot.theta - dx * 0.006; }
+    else if (down && !dragHinted && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 60) { dragHinted = true; hint('按住鼠标右键拖动可以转视角，Q / E 也行'); hintLock = 3; }
+    return;
+  }
   if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pinch && ptrs.size >= 2) { cam.zoom = clamp(pinch.zoom * pinch.d / ptrDist(), 0.45, 1.8); return; }
   if (down) {
@@ -163,6 +176,11 @@ canvas.addEventListener('pointermove', e => {
   }
 });
 function ptrEnd(e, cancel) {
+  if (e.pointerType === 'mouse') {
+    if (rot && e.button === rot.btn) { if (!rot.moved && rot.btn === 2) setSel(null); rot = null; }
+    if (e.button === 0) down = null;
+    return;
+  }
   ptrs.delete(e.pointerId);
   if (ptrs.size < 2) pinch = null;
   if (!cancel && down && !down.moved && ptrs.size === 0) onClick(e.clientX, e.clientY);
@@ -172,9 +190,13 @@ canvas.addEventListener('pointerup', e => ptrEnd(e, false));
 canvas.addEventListener('pointercancel', e => ptrEnd(e, true));
 canvas.addEventListener('wheel', e => { e.preventDefault(); cam.zoom = clamp(cam.zoom * (1 + e.deltaY * 0.001), 0.45, 1.8); }, { passive: false });
 addEventListener('keydown', e => {
-  if (!G || G.over) return;
+  if ($('#help').classList.contains('show')) { if (e.key === 'Escape') closeHelp(); return; }
+  if (!G || G.over || idle) return;
+  if (e.key === 'h' || e.key === 'H' || e.key === '?') { openHelp(); return; }
   if (e.key === 'Escape') setSel(null);
   else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+  else if (e.key === 'q' || e.key === 'Q') cam.theta += 0.35;
+  else if (e.key === 'e' || e.key === 'E') cam.theta -= 0.35;
   else if (e.key === '0') setSel(sel === 'demolish' ? null : 'demolish');
   else if (/^[1-9]$/.test(e.key)) { const ks = ORDER.filter(unlocked), k = ks[+e.key - 1]; if (k) setSel(sel === k ? null : k); }
 });
@@ -182,11 +204,23 @@ function onClick(cx, cy) {
   if (!G || G.over || paused) return;
   const p = groundAt(cx, cy); if (p) clickAt(p);
 }
-function clickAt(p) {
-  if (sel === 'demolish') { tryDemolish(Math.round(p.x), Math.round(p.z)); return; }
-  if (sel) { tryPlace(Math.round(p.x), Math.round(p.z)); return; }
+function sharkAt(p) {
   let best = null, bd = 1e9;
   sharks.forEach(s => { if (s.dead) return; const d = Math.hypot(s.x - p.x, s.z - p.z); if (d < (s.boss ? 3 : 1.6) && d < bd) { bd = d; best = s; } });
+  return best;
+}
+function clickAt(p) {
+  const cx = Math.round(p.x), cz = Math.round(p.z);
+  if (sel === 'demolish') { tryDemolish(cx, cz); return; }
+  if (sel) {
+    // 建造模式里也能修木板、扎鲨鱼：咬坏的木板先修，能放就放，点到鲨鱼就扎
+    const bt = tiles.get(key(cx, cz));
+    if (bt && bt.hp < tileMaxHp()) { tryRepair(bt); return; }
+    if (validPlace(sel, cx, cz)) { tryPlace(cx, cz); return; }
+    const sk = sharkAt(p); if (sk) return playerSpear(sk);
+    tryPlace(cx, cz); return;
+  }
+  const best = sharkAt(p);
   if (best) return playerSpear(best);
   const t = tiles.get(key(Math.round(p.x), Math.round(p.z)));
   if (t) { if (!tryRepair(t)) hint('点海面甩钩，点鲨鱼扎它'); return; }
@@ -229,7 +263,35 @@ function updateGhost() {
 function togglePause() { paused = !paused; $('#paused').style.display = paused ? 'block' : 'none'; $('#pauseBtn').textContent = paused ? '▶' : '⏸'; }
 $('#pauseBtn').onclick = togglePause;
 const SOUND_UI = [['🔊', '声音全开'], ['🔉', '已关海浪雨声，保留音效'], ['🔇', '已静音']];
-function applySound() { muted = soundMode === 2; $('#muteBtn').textContent = SOUND_UI[soundMode][0]; $('#muteBtn').title = SOUND_UI[soundMode][1]; }
+function applySound() {
+  muted = soundMode === 2; $('#muteBtn').textContent = SOUND_UI[soundMode][0]; $('#muteBtn').title = SOUND_UI[soundMode][1];
+  document.querySelectorAll('#soundSeg button').forEach(b => b.classList.toggle('on', +b.dataset.v === soundMode));
+}
+// ---------- 设置与玩法说明 ----------
+let helpPausedBefore = false;
+function helpTab(t) {
+  document.querySelectorAll('.helpTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('table.keys').forEach(tb => tb.style.display = tb.dataset.for === t ? '' : 'none');
+}
+function openHelp() {
+  if ($('#help').classList.contains('show')) return;
+  helpPausedBefore = paused; if (!paused && G && !idle) togglePause();
+  $('#paused').style.display = 'none';
+  helpTab(IS_TOUCH ? 'mobile' : 'pc'); applySound();
+  $('#help').classList.add('show');
+}
+function closeHelp() {
+  if (!$('#help').classList.contains('show')) return;
+  $('#help').classList.remove('show');
+  if (paused && !helpPausedBefore) togglePause(); else if (paused) $('#paused').style.display = 'block';
+}
+$('#helpBtn').onclick = openHelp;
+$('#helpOk').onclick = $('#helpClose').onclick = closeHelp;
+$('#help').addEventListener('click', e => { if (e.target.id === 'help') closeHelp(); });
+document.querySelectorAll('.helpTabs button').forEach(b => b.onclick = () => helpTab(b.dataset.tab));
+document.querySelectorAll('#soundSeg button').forEach(b => b.onclick = () => { soundMode = +b.dataset.v; localStorage.setItem('cww-sound', soundMode); audioInit(); applySound(); });
+$('#helpReplay').onclick = () => { $('#help').classList.remove('show'); playIntro(() => { $('#hud').style.display = ''; if (paused) togglePause(); }); };
+$('#helpHome').onclick = () => { $('#help').classList.remove('show'); save(); if (!paused) togglePause(); showStart(); };
 $('#muteBtn').onclick = () => { soundMode = (soundMode + 1) % 3; localStorage.setItem('cww-sound', soundMode); applySound(); hint(SOUND_UI[soundMode][1]); hintLock = 1.5; };
 applySound();
 if (/netlify\.app$/.test(location.hostname)) document.body.classList.add('has-badge');
@@ -299,6 +361,7 @@ function newGame(perk) {
   if (perk === 'urine') placeBuilding(tiles.get(key(1, 1)), 'urine');
   if (perk === 'toilet') { placeBuilding(tiles.get(key(1, 1)), 'toilet'); G.res.scrap += 15; G.res.wood += 10; }
   begin(); banner('疯狂水世界，启动！', '三分钟一局，巨爽巨解压'); jumpT = 1.1; sayIdle = 14;
+  if (!localStorage.getItem('cww-help-seen')) { localStorage.setItem('cww-help-seen', '1'); setTimeout(() => G && !G.over && openHelp(), 1800); }
   setTimeout(() => G && !G.over && qsay('老板你等着，我一定会回来的！', 3.5, true), 2600);
   save();
 }
