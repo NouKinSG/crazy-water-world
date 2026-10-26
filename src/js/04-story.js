@@ -11,11 +11,11 @@ function startAmbient() {
     const lfo = AC.createOscillator(); lfo.frequency.value = 0.13;
     const lfoGain = AC.createGain(); lfoGain.gain.value = 0.03;
     lfo.connect(lfoGain).connect(seaGain.gain);
-    sea.connect(seaLp).connect(seaGain).connect(AC.destination);
+    sea.connect(seaLp).connect(seaGain).connect(master);
     const rainSrc = AC.createBufferSource(); rainSrc.buffer = buf; rainSrc.loop = true; rainSrc.playbackRate.value = 1.3;
     const rainHp = AC.createBiquadFilter(); rainHp.type = 'bandpass'; rainHp.frequency.value = 1400; rainHp.Q.value = 0.5;
     const rainGain = AC.createGain(); rainGain.gain.value = 0;
-    rainSrc.connect(rainHp).connect(rainGain).connect(AC.destination);
+    rainSrc.connect(rainHp).connect(rainGain).connect(master);
     sea.start(); lfo.start(); rainSrc.start();
     ambient = { seaGain, rainGain };
   } catch (e) {}
@@ -77,7 +77,8 @@ const CS_SUBS = [
   [17.2, 19.4, '肥强', '三十年河东，三十年河西……'],
   [19.5, 22.4, '肥强', '我这就去打捞海水过滤器，住进高级庇护所！'],
 ];
-const VOICE = { '旁白': [330, 0.02, 'triangle'], '庇护所老板': [150, 0.035, 'square'], '肥强': [230, 0.035, 'square'], '游艇上的富人': [520, 0.03, 'square'] };
+// 每个角色的说话音：[音高, 音量, 波形, 低通]。方波保留一点 8-bit 味，但压低高频
+const VOICE = { '旁白': [300, 0.016, 'sine', 1200], '庇护所老板': [140, 0.03, 'square', 900], '肥强': [220, 0.026, 'square', 1100], '游艇上的富人': [480, 0.022, 'triangle', 1800] };
 // 打字机效果：没打出来的字先占位（透明），气泡和字幕的宽度不会跳
 function typeInto(el, full, n) {
   const k = full + '|' + n; if (el._k === k) return; el._k = k;
@@ -105,10 +106,12 @@ function playIntro(onEnd) {
   $('#start').classList.remove('show'); $('#hud').style.display = 'none';
   $('#cut').classList.add('show'); $('#cutTitle').classList.remove('show'); $('#cutCard').classList.remove('show');
   CS.skipping = 0;
+  if (musicBus) { musicBus.gain.cancelScheduledValues(AC.currentTime); musicBus.gain.setValueAtTime(1, AC.currentTime); }
 }
 function endIntro() {
   if (!CS.active) return;
   CS.active = false; scene.remove(CS.group); CS.group = null;
+  if (musicBus) musicBus.gain.setTargetAtTime(0, AC.currentTime, 0.25);
   raft.visible = true; if (mount.g) mount.g.visible = true;
   $('#cut').classList.remove('show'); typeInto($('#cutLine'), '', 0); $('#cutWho').textContent = '';
   const f = CS.onEnd; CS.onEnd = null; f && f();
@@ -126,20 +129,27 @@ function updateIntro(dt) {
     const n = Math.min(sub[3].length, Math.floor((t - sub[0]) * 16) + 1);
     typeInto($('#cutLine'), sub[3], n);
     if (CS.subKey !== sub[3]) { CS.subKey = sub[3]; CS.typed = 0; }
-    if (n > CS.typed) { const ch = sub[3][n - 1]; if (n % 2 && !/[\s，。？！…、]/.test(ch)) blip(VOICE[sub[2]][0], VOICE[sub[2]][1], VOICE[sub[2]][2]); CS.typed = n; }
+    if (n > CS.typed) { const ch = sub[3][n - 1]; if (n % 2 && !/[\s，。？！…、]/.test(ch)) blip(...VOICE[sub[2]]); CS.typed = n; }
   } else typeInto($('#cutLine'), '', 0);
   // 事件
   csOnce('card', 0.2, () => $('#cutCard').classList.add('show'));
+  // 配乐：Am → Dm（被拒之门外）→ Am 低（落水）→ F → G（三十年河东）→ C 大和弦（启动）
+  csOnce('m1', 0.1, () => { pad([220, 261.6, 329.6], 4.4); noise(3, 0.03, 500); });
+  csOnce('m2', 4.3, () => pad([146.8, 174.6, 220], 6.8, 0.018));
+  csOnce('m3', 12.3, () => pad([110, 164.8, 220], 4.8, 0.02));
+  csOnce('m4', 17.1, () => pad([174.6, 220, 261.6], 2.4, 0.02));
+  csOnce('m5', 19.5, () => pad([196, 246.9, 293.7, 392], 3.2, 0.022));
+  csOnce('m6', 22.6, () => { pad([130.8, 196, 261.6, 329.6], 3.8, 0.026); arp([523, 659, 784, 1046, 1318], 0.11, 0.045, 'triangle'); });
   csOnce('cardOff', 3.6, () => $('#cutCard').classList.remove('show'));
-  csOnce('kick', 11.0, () => { sfx('bite'); shake(0.4); floatText(V(0, 2.2, -6.4), '滚！', '#ff6b5b', 1.2); });
+  csOnce('kick', 11.0, () => { sfx('thud'); shake(0.4); floatText(V(0, 2.2, -6.4), '滚！', '#ff6b5b', 1.2); });
   csOnce('splash', 12.2, () => { sfx('splash'); puff(V(1.5, 0.2, 2.5), 0xffffff, 14); });
   csOnce('rain', 12.6, () => CS.weather = 'rain');
-  csOnce('laugh', 15.2, () => floatText(CS.yacht.position.clone().setY(2.2), '哈哈哈哈哈', '#9be7ff', 1.8));
+  csOnce('laugh', 15.2, () => { floatText(CS.yacht.position.clone().setY(2.2), '哈哈哈哈哈', '#9be7ff', 1.8); [0, 0.16, 0.32].forEach(d => tone(560, 470, 0.11, 'triangle', 0.022, d, { lp: 1800 })); });
   csOnce('storm', 17.2, () => { CS.weather = 'storm'; flash = 0.6; setTimeout(() => sfx('thunder'), 200); });
-  csOnce('punch', 19.0, () => { CS.wall.visible = false; puff(V(3.0, 0.6, 3.0), 0xeef1f3, 26); shake(0.5); sfx('bite'); sfx('hit'); floatText(V(3.0, 1.6, 3.0), '砰！', '#ffffff', 1); });
+  csOnce('punch', 19.0, () => { CS.wall.visible = false; puff(V(3.0, 0.6, 3.0), 0xeef1f3, 26); shake(0.5); sfx('crack'); floatText(V(3.0, 1.6, 3.0), '砰！', '#ffffff', 1); });
   csOnce('flash2', 19.6, () => { flash = 0.6; setTimeout(() => sfx('thunder'), 250); });
   csOnce('jump', 20.3, () => sfx('throw'));
-  csOnce('title', 22.6, () => { $('#cutTitle').classList.add('show'); sfx('gold'); flash = 0.8; shake(0.4); });
+  csOnce('title', 22.6, () => { $('#cutTitle').classList.add('show'); flash = 0.5; shake(0.25); });
   if (CS.skipping) CS.skipping += dt;
   const fade = Math.max(1 - t / 0.8, seg(t, CS_END - 0.6, CS_END), CS.skipping ? Math.min(1, CS.skipping / 0.3) : 0);
   $('#cutFade').style.opacity = fade.toFixed(3);
@@ -234,7 +244,7 @@ function updateSay(dt) {
   if (sayLeft <= 0) { sayEl.classList.remove('show'); return; }
   if (sayTyped < sayText.length && !paused) {
     const n = Math.min(sayText.length, sayTyped + Math.max(1, Math.round(dt * 20)));
-    if (n % 3 === 0 && !/[\s，。？！…、]/.test(sayText[n - 1])) blip(240, 0.018);
+    if (n % 3 === 0 && !/[\s，。？！…、]/.test(sayText[n - 1])) blip(230, 0.014, 'square', 1000);
     sayTyped = n; typeInto(sayEl, sayText, n);
   }
   const who = mount.state !== 'dock' ? rider : avatar;

@@ -49,46 +49,73 @@ function audioInit() {
     noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    // 总线：所有声音先过低通（削掉刺耳高频）和压缩器（同时响很多声也不会炸），再到喇叭
+    master = AC.createGain(); master.gain.value = 0.9;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4200; lp.Q.value = 0.3;
+    const comp = AC.createDynamicsCompressor();
+    comp.threshold.value = -22; comp.knee.value = 12; comp.ratio.value = 3; comp.attack.value = 0.004; comp.release.value = 0.25;
+    master.connect(lp).connect(comp).connect(AC.destination);
+    // 回声：给「叮叮叮」这类奖励音和剧情配乐加一点余韵
+    echoIn = AC.createGain();
+    const dl = AC.createDelay(1), fb = AC.createGain(), wet = AC.createGain(), dlp = AC.createBiquadFilter();
+    dl.delayTime.value = 0.22; fb.gain.value = 0.3; wet.gain.value = 0.32; dlp.type = 'lowpass'; dlp.frequency.value = 2200;
+    echoIn.connect(dl); dl.connect(dlp).connect(fb).connect(dl); dlp.connect(wet).connect(master);
+    // 剧情配乐单独一路，跳过剧情时能一起淡出
+    musicBus = AC.createGain(); musicBus.connect(master);
   } catch (e) { AC = null; }
 }
-function tone(f1, f2, dur, type = 'sine', vol = 0.15, delay = 0) {
+let master = null, echoIn = null, musicBus = null;
+// o: { atk 起音秒数, echo 是否加回声, lp 单独低通频率, bus 输出到哪路 }
+function tone(f1, f2, dur, type = 'sine', vol = 0.15, delay = 0, o = {}) {
   if (!AC || muted) return;
-  const t0 = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(f1, t0);
-  o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t0 + dur);
-  g.gain.setValueAtTime(vol, t0);
-  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-  o.connect(g).connect(AC.destination);
-  o.start(t0); o.stop(t0 + dur + 0.02);
+  const t0 = AC.currentTime + delay, osc = AC.createOscillator(), g = AC.createGain(), atk = o.atk ?? 0.008;
+  osc.type = type;
+  osc.frequency.setValueAtTime(f1, t0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(vol, t0 + atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + Math.max(dur, atk + 0.02));
+  let node = osc;
+  if (o.lp) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; node = node.connect(f); }
+  node.connect(g).connect(o.bus || master);
+  if (o.echo) g.connect(echoIn);
+  osc.start(t0); osc.stop(t0 + Math.max(dur, atk + 0.02) + 0.05);
 }
-function noise(dur, vol = 0.2, freq = 900) {
+function noise(dur, vol = 0.2, freq = 900, delay = 0) {
   if (!AC || muted) return;
-  const t0 = AC.currentTime, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
-  s.buffer = noiseBuf; f.type = 'lowpass';
+  const t0 = AC.currentTime + delay, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = noiseBuf; s.loop = true; f.type = 'lowpass';
   f.frequency.setValueAtTime(freq, t0);
-  f.frequency.exponentialRampToValueAtTime(150, t0 + dur);
-  g.gain.setValueAtTime(vol, t0);
-  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-  s.connect(f).connect(g).connect(AC.destination);
-  s.start(t0); s.stop(t0 + dur);
+  f.frequency.exponentialRampToValueAtTime(120, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f).connect(g).connect(master);
+  s.start(t0); s.stop(t0 + dur + 0.05);
 }
+// 柔和的长音和弦（剧情配乐用）：慢起慢收
+function pad(freqs, dur, vol = 0.022, delay = 0) {
+  freqs.forEach((f, i) => { tone(f, f * 1.002, dur, i ? 'sine' : 'triangle', vol, delay, { atk: Math.min(1.2, dur * 0.35), lp: 1400, bus: musicBus, echo: true }); });
+}
+const arp = (notes, gap, vol, type = 'sine') => notes.forEach((f, i) => tone(f, f, 0.32, type, vol, i * gap, { echo: true, lp: 2600 }));
 const SFX = {
-  throw: () => tone(500, 180, 0.18, 'triangle', 0.08),
-  splash: () => noise(0.35, 0.16, 1400),
-  catch: () => { tone(660, 660, 0.07, 'triangle', 0.05); tone(990, 990, 0.1, 'triangle', 0.045, 0.06); },
-  build: () => { tone(140, 60, 0.18, 'sine', 0.3); noise(0.1, 0.12, 2500); },
-  bite: () => { tone(150, 60, 0.22, 'triangle', 0.14); noise(0.14, 0.1, 500); },
-  hit: () => tone(420, 220, 0.08, 'triangle', 0.045),
-  shot: () => noise(0.06, 0.025, 2200),
-  laser: () => tone(900, 380, 0.1, 'triangle', 0.025),
-  kill: () => tone(300, 800, 0.2, 'square', 0.06),
-  gold: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.25, 'triangle', 0.12, i * 0.09)),
-  up: () => [392, 523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.3, 'square', 0.06, i * 0.08)),
-  thunder: () => { noise(1.6, 0.16, 220); tone(55, 30, 1.0, 'sine', 0.13); },
-  meow: () => { tone(820, 1150, 0.09, 'triangle', 0.05); tone(1150, 650, 0.2, 'triangle', 0.05, 0.09); },
-  over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, f * 0.98, 0.35, 'triangle', 0.12, i * 0.18)),
-  no: () => tone(200, 150, 0.12, 'square', 0.05),
+  throw: () => noise(0.22, 0.04, 1500),
+  splash: () => noise(0.45, 0.07, 900),
+  catch: () => { tone(784, 800, 0.1, 'sine', 0.045); tone(1175, 1190, 0.14, 'sine', 0.035, 0.07); },
+  build: () => { tone(240, 150, 0.12, 'sine', 0.1); noise(0.07, 0.035, 1100); },
+  bite: () => { tone(120, 55, 0.24, 'sine', 0.12); noise(0.12, 0.04, 380); },
+  hit: () => tone(330, 260, 0.08, 'sine', 0.035),
+  shot: () => noise(0.05, 0.016, 1400),
+  laser: () => tone(700, 420, 0.09, 'sine', 0.018),
+  kill: () => { tone(392, 400, 0.12, 'sine', 0.04); tone(587, 600, 0.18, 'sine', 0.035, 0.09); },
+  gold: () => arp([523, 659, 784, 1046], 0.09, 0.05),
+  up: () => arp([392, 523, 659, 784, 1046], 0.08, 0.045, 'triangle'),
+  thunder: () => { noise(1.8, 0.1, 180); tone(52, 30, 1.2, 'sine', 0.09); },
+  meow: () => { tone(820, 1150, 0.09, 'sine', 0.04); tone(1150, 650, 0.2, 'sine', 0.04, 0.09); },
+  over: () => arp([392, 330, 262, 196], 0.2, 0.05, 'triangle'),
+  no: () => tone(190, 150, 0.1, 'sine', 0.045),
+  thud: () => { tone(110, 50, 0.3, 'sine', 0.14); noise(0.18, 0.05, 300); },
+  crack: () => { tone(160, 60, 0.25, 'sine', 0.12); noise(0.3, 0.06, 1200); },
 };
 // 同一种音效短时间内只响一次，避免炮台、自动打捞一多就吵成一片
 const SFX_GAP = { shot: 0.12, laser: 0.12, hit: 0.08, catch: 0.1, splash: 0.15, bite: 0.3, kill: 0.15, throw: 0.08 }, sfxLast = {};
@@ -99,8 +126,8 @@ function sfx(n) {
   sfxLast[n] = now;
   try { SFX[n] && SFX[n](); } catch (e) {}
 }
-// 8-bit 说话声：每个字一声短促的「嘟」
-function blip(freq, vol = 0.035, type = 'square') { tone(freq * rand(0.94, 1.06), freq * rand(0.9, 1.0), 0.05, type, vol); }
+// 8-bit 说话声：每个字一声短促的「嘟」，过一道低通，圆润不扎耳
+function blip(freq, vol = 0.03, type = 'triangle', lp = 1600) { tone(freq * rand(0.95, 1.05), freq * rand(0.92, 1.0), 0.06, type, vol, 0, { atk: 0.006, lp }); }
 
 // ================= 场景 =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });

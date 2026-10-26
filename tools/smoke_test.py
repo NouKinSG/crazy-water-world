@@ -26,6 +26,8 @@ TEST_SCRIPT = r"""
 <script>window.__ERR=[];window.onerror=(m,s,l,c)=>{__ERR.push(m+' @'+l+':'+c)};</script>
 <script>setTimeout(()=>{try{
 const A=__G, log=[];
+// 声音：启动音频，把所有音效、配乐、说话声都触发一遍，确认不报错
+audioInit(); startAmbient(); Object.keys(SFX).forEach(k=>SFX[k]()); pad([220,261.6,329.6],2); blip(...VOICE['肥强']); log.push('音频='+(!!AC&&!!master));
 A.newGame('filter'); const G=A.G; G.res.wood=G.res.plastic=G.res.scrap=999;
 for(let k=0;k<40;k++) step(0.05);
 A.onClickWorld({x:A.raftC.x+22,z:A.raftC.z+3}); for(let k=0;k<400;k++) step(0.05);
