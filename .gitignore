@@ -1,3 +1,5 @@
 .DS_Store
 tools/.tmp/
 __pycache__/
+tools/.venv/
+promo/out/
