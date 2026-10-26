@@ -206,7 +206,7 @@ function onClick(cx, cy) {
 }
 function sharkAt(p) {
   let best = null, bd = 1e9;
-  sharks.forEach(s => { if (s.dead) return; const d = Math.hypot(s.x - p.x, s.z - p.z); if (d < (s.boss ? 3 : 1.6) && d < bd) { bd = d; best = s; } });
+  sharks.forEach(s => { if (s.dead) return; const d = Math.hypot(s.x - p.x, s.z - p.z); if (d < (s.boss || s.kind ? 3.2 : 1.6) && d < bd) { bd = d; best = s; } });
   return best;
 }
 function clickAt(p) {
@@ -342,6 +342,7 @@ function resetWorld() {
   if (yacht) { scene.remove(yacht.g); yacht = null; } yachtTimer = 25;
   npcs.forEach(n => raft.remove(n.g)); npcs.length = 0; cats.forEach(c => raft.remove(c.g)); cats.length = 0;
   if (mount.g) { mount.g.remove(rider); scene.remove(mount.g); } mount.g = null; mount.kind = null; mount.launched = false; avatar.visible = true; jumpT = 0;
+  cannonballs.forEach(b => scene.remove(b.m)); cannonballs.length = 0; bsay.left = 0;
   playerHook = null; sel = null; barSig = upSig = resSig = ''; spawnTimer = 0; autoTimer = 3;
 }
 function begin() {
@@ -408,7 +409,7 @@ function frame(now) {
 function step(dt) {
   T += dt;
   if (CS.active) { updateIntro(dt); updateOcean(T, cam.tx, cam.tz); updateWeather(dt); updateLighting(); updateFx(dt); updateFloats(dt); updateAmbient(); return; }
-  updateAmbient(); updateSay(dt);
+  updateAmbient(); updateSay(dt); updateBossUI(dt);
   if (G && !G.over && !paused) gameUpdate(dt);
   if (G && !idle) {
     hintLock -= dt;

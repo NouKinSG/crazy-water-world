@@ -230,6 +230,14 @@ const TEX = {
   }),
 };
 TEX.windows.wrapS = TEX.windows.wrapT = THREE.RepeatWrapping;
+// 肥强的粉色爱心大短裤
+TEX.hearts = canvasTex(64, (g, s) => {
+  g.fillStyle = '#f48fb1'; g.fillRect(0, 0, s, s); g.fillStyle = '#e53950';
+  for (let y = 6; y < s; y += 16) for (let x = (y / 16 % 2) * 8 + 6; x < s; x += 16) {
+    g.beginPath(); g.moveTo(x, y + 4); g.arc(x - 2, y + 1, 2.2, Math.PI * 0.8, Math.PI * 2.0); g.arc(x + 2, y + 1, 2.2, Math.PI, Math.PI * 2.2); g.lineTo(x, y + 6); g.fill();
+  }
+});
+TEX.hearts.wrapS = TEX.hearts.wrapT = THREE.RepeatWrapping; TEX.hearts.repeat.set(2, 1);
 
 // 夜里会亮的共享材质
 const GLOW = {
@@ -566,7 +574,8 @@ function makeYacht() {
 
 // ---------- 肥强、阿水、哈吉米 ----------
 function makeFeiqiang() {
-  const skin = mat(0xf2b98a), shirt = mat(0xf3efe6), shorts = mat(0x3b6fb6), dark = mat(0x2b2b2b);
+  const skin = mat(0xf2b98a), shirt = mat(0xf3efe6), dark = mat(0x2b2b2b);
+  const shorts = new THREE.MeshStandardMaterial({ map: TEX.hearts, roughness: 0.8 });
   const belly = mesh(new THREE.SphereGeometry(0.25, 10, 8), shirt, 0, 0.5, 0.02); belly.scale.set(1, 1.1, 0.95);
   const g = grp(belly,
     mesh(new THREE.CylinderGeometry(0.21, 0.2, 0.14, 10), shorts, 0, 0.27, 0),
@@ -583,13 +592,18 @@ function makeFeiqiang() {
   [-1, 1].forEach(s => { const a = mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.34, 6), skin, s * 0.29, 0.55, 0); a.rotation.z = s * 0.35; g.add(a); });
   return g;
 }
-function makeAshui(shirtColor, hairColor = 0x1d1d1f) {
+// 阿水：第一个是广告里的样子——乱糟糟黑发、红色无袖背心、牛仔裤；后面来的幸存者换衣服颜色
+function makeAshui(shirtColor, hairColor = 0x1d1d1f, legsColor = 0x37474f, messy = false) {
   const skin = mat(0xf5c9a0);
   const hair = mesh(new THREE.SphereGeometry(0.15, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(hairColor), 0, 0.88, -0.01);
-  return grp(mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.42, 8), mat(shirtColor), 0, 0.48, 0),
-    mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 6), mat(0x37474f), -0.06, 0.14, 0),
-    mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 6), mat(0x37474f), 0.06, 0.14, 0),
+  const g = grp(mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.42, 8), mat(shirtColor), 0, 0.48, 0),
+    mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 6), mat(legsColor), -0.06, 0.14, 0),
+    mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 6), mat(legsColor), 0.06, 0.14, 0),
     mesh(new THREE.SphereGeometry(0.14, 8, 6), skin, 0, 0.83, 0), hair);
+  if (messy) for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2, sp = mesh(new THREE.ConeGeometry(0.05, 0.14, 4), mat(hairColor), Math.cos(a) * 0.1, 0.98, Math.sin(a) * 0.1); sp.rotation.set(Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6); g.add(sp); }
+  else return g;
+  [-1, 1].forEach(sd => { const arm = mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.32, 6), skin, sd * 0.17, 0.5, 0); arm.rotation.z = sd * 0.18; g.add(arm); });
+  return g;
 }
 function makeCat() {
   const fur = mat(0xf4a340);

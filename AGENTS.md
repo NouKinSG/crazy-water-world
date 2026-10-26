@@ -30,6 +30,7 @@
 | `step(dt)` | 03-ui | 主循环每帧；开场剧情期间走 `updateIntro` 分支 |
 | `playIntro` / `CS_SUBS` | 04-story | 开场剧情的时间轴和字幕 |
 | `qsay` / `qsayKey` | 04-story | 肥强头顶台词（带冷却） |
+| `BOSS_ORDER` / `BOSS_INFO` / `BOSS_AI` | 05-boss | 每 5 天一个 Boss（`spawnBossForDay`），带 `kind` 的走专属行为，没有 `kind` 的深海巨兽沿用鲨鱼逻辑；奖励在 `bossDefeated` |
 
 ## 约定
 

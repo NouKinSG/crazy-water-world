@@ -179,16 +179,24 @@ function damageShark(s, dmg, show) {
     s.dead = true; G.kills++; sfx('kill'); s.bar.visible = false;
     if (s.boss) qsay('深海巨兽？就这？', 3, true); else qsayKey('kill', 8, ['就这？', '晚饭有着落了！', '还有谁！']);
     const at = new THREE.Vector3(s.x, 1.4, s.z);
-    if (s.boss) { G.res.scrap += 25; G.res.plastic += 20; G.food = Math.min(100, G.food + 50); banner('击败深海巨兽！', '+25 ⚙️  +20 🧴  +50 🍖'); sfx('up'); }
+    if (s.kind) bossDefeated(s);
+    else if (s.boss) { G.bossWins = (G.bossWins || 0) + 1; G.res.scrap += 25; G.res.plastic += 20; G.food = Math.min(100, G.food + 50); banner('击败深海巨兽！', '+25 ⚙️  +20 🧴  +50 🍖'); sfx('up'); }
     else { G.res.scrap += 2; G.food = Math.min(100, G.food + 10); floatText(at, '+10 🍖 +2 ⚙️', '#FFC53D'); }
   }
 }
 function updateSharks(dt) {
+  updateCannonballs(dt); if (G.over) return;
   for (let i = sharks.length - 1; i >= 0; i--) {
     const s = sharks[i];
     if (s.dead) {
-      s.sink += dt; s.g.position.y -= dt * 1.5; s.g.rotation.x += dt * 2;
-      if (s.sink > 1.3) { scene.remove(s.g); scene.remove(s.bar); sharks.splice(i, 1); }
+      s.sink += dt; s.g.position.y -= dt * 1.5; s.g.rotation.x += dt * (s.kind ? 0.4 : 2);
+      if (s.sink > (s.kind ? 2.2 : 1.3)) { scene.remove(s.g); scene.remove(s.bar); sharks.splice(i, 1); }
+      continue;
+    }
+    // 肌肉佬 / 收租船 / 战舰走 05-boss.js 里的专属行为
+    if (s.kind) {
+      BOSS_AI[s.kind](s, dt); if (G.over) return;
+      s.flash = Math.max(0, s.flash - dt); s.bodyMat.emissiveIntensity = s.flash > 0 ? 0.6 : 0;
       continue;
     }
     const night = G.wasNight;
@@ -352,7 +360,7 @@ function upgrade() {
 }
 
 // ---------- 天数 ----------
-const DAY_TIPS = { 2: '天黑以后鲨鱼会来咬木筏', 3: '蓝色物资桶记得验货', 4: '别人开游艇，你只能划澡盆——右上角攒材料升级', 5: '今晚鲨鱼群来袭', 6: '开局一定要选海水过滤器（你选了吗）', 7: 'No more fake ads', 8: '妹子排队倒贴？不存在的，先活下来', 10: '深海巨兽要来了' };
+const DAY_TIPS = { 2: '天黑以后鲨鱼会来咬木筏', 3: '蓝色物资桶记得验货', 4: '明晚肌肉佬要来推墙，多铺几块地板', 5: '今晚肌肉佬骑着翡翠蟹来了', 6: '开局一定要选海水过滤器（你选了吗）', 7: 'No more fake ads', 8: '妹子排队倒贴？不存在的，先活下来', 9: '明晚王总来收床位费，先把炮台造好', 10: '今晚王总的收租船来了', 14: '明晚深海巨兽出没', 15: '今晚深海巨兽来了', 19: '明晚……当年踢你出门的老板来了', 20: '今晚老板的黄金战舰来了' };
 const MEME = ['海平面又涨了，陆地一块也不剩', '陆地全淹了，只剩你这块木筏', '三分钟一局，巨爽巨解压', '三十年河东，三十年河西', '海水过滤器，你捞到了吗？', '我这就去打捞海水过滤器', '疯狂水世界，启动！'];
 const WEATHER = { overcast: { name: '阴天', icon: '☁️', rain: 0, storm: 0 }, rain: { name: '下雨', icon: '🌧', rain: 0.55, storm: 0.35 }, storm: { name: '暴雨', icon: '⛈', rain: 1, storm: 1 } };
 function onNewDay() {
@@ -364,9 +372,8 @@ function onNewDay() {
 function onNight() {
   setTimeout(() => G && !G.over && qsayKey('night', 0, ['鲨鱼又来了……抄家伙！', '天黑了，看好木板！']), 1500);
   let n = (G.day === 1 ? 1 : Math.min(6, 1 + Math.floor(G.day / 3))) + (G.weather === 'storm' ? 1 : 0);
-  if (G.day % 5 === 0) { n += 2; setTimeout(() => G && !G.over && banner('鲨鱼群来袭！', '点鲨鱼扎它，或者造鱼叉炮台', 'red'), 400); }
+  if (G.day % 5 === 0) { n += 1; spawnBossForDay(G.day); }
   for (let i = 0; i < n; i++) spawnShark(false, i * 5);
-  if (G.day >= 10 && G.day % 5 === 0) { spawnShark(true, 10); setTimeout(() => G && !G.over && banner('深海巨兽出现了！', '它一口能咬掉 3 点耐久', 'red'), 2600); }
 }
 function daylight(p) { return p < 0.62 ? 1 : p < 0.74 ? 1 - (p - 0.62) / 0.12 : p < 0.94 ? 0 : (p - 0.94) / 0.06; }
 
@@ -449,7 +456,7 @@ function syncNpcs() {
   const want = Math.min(6, counts.house + counts.tower * 3);
   while (npcs.length > want) raft.remove(npcs.pop().g);
   while (npcs.length < want && tiles.size) {
-    const i = npcs.length, g = makeAshui(NPC_SHIRTS[i % NPC_SHIRTS.length]), tile = freeTile();
+    const i = npcs.length, g = i === 0 ? makeAshui(0xb71c1c, 0x1d1d1f, 0x5b7ea8, true) : makeAshui(NPC_SHIRTS[i % NPC_SHIRTS.length]), tile = freeTile();
     g.position.set(tile.x + rand(-0.2, 0.2), 0.3, tile.z + rand(-0.2, 0.2)); raft.add(g);
     npcs.push({ g, tile });
     if (i === 0 && announceNpc) { banner('阿水加入了！', '主角来给配角打工了，他会帮你自动甩钩'); floatText(tileWorld(tile, 1.4), '阿水', '#9bd6ff', 2); }

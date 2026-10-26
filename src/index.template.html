@@ -75,6 +75,14 @@ canvas{display:block;touch-action:none}
 .ovBox .primary{width:220px}
 #floats{position:fixed;inset:0;pointer-events:none}
 #say{position:fixed;left:0;top:0;transform:translate(-50%,-100%) scale(.85);opacity:0;transition:opacity .2s,transform .25s cubic-bezier(.2,1.6,.4,1);pointer-events:none;background:#fff;color:#1d1d1f;font-size:15px;font-weight:800;padding:8px 14px;border-radius:12px;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.35);border:2px solid var(--accent)}
+#bsay{position:fixed;left:0;top:0;transform:translate(-50%,-100%) scale(.85);opacity:0;transition:opacity .2s,transform .25s cubic-bezier(.2,1.6,.4,1);pointer-events:none;background:#1d1d1f;color:#fff;font-size:15px;font-weight:800;padding:8px 14px;border-radius:12px;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.4);border:2px solid #ff6b5b}
+#bsay.show{opacity:1;transform:translate(-50%,-100%) scale(1)}
+#bsay::after{content:'';position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);border-width:9px 7px 0;border-style:solid;border-color:#ff6b5b transparent transparent}
+#bossBar{position:absolute;left:50%;top:78px;transform:translateX(-50%);width:min(420px,60vw);text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
+#bossBar.show{opacity:1}
+#bossName{font-size:14px;font-weight:900;color:#ff8a80;text-shadow:0 1px 4px rgba(0,0,0,.7);margin-bottom:5px;letter-spacing:1px}
+.btrack{height:8px;border-radius:4px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.15);overflow:hidden}
+#bossFill{height:100%;background:linear-gradient(90deg,#ff5252,#ff8a65);border-radius:4px;transition:width .2s}
 #say.show{opacity:1;transform:translate(-50%,-100%) scale(1)}
 #say::after{content:'';position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);border-width:9px 7px 0;border-style:solid;border-color:var(--accent) transparent transparent}
 #cutFade{transition:none!important}
@@ -143,6 +151,9 @@ ul.tips{padding-left:18px;font-size:13px;color:var(--t2);line-height:1.75}ul.tip
   #cutCard{font-size:24px;letter-spacing:3px;white-space:nowrap}
   #cutTitle .t{font-size:36px}#cutTitle .s{font-size:14px}
   #cutSkip{top:2vh;right:10px;height:30px;font-size:12px}
+  #bossBar{top:auto;bottom:212px;width:70vw}#bossName{font-size:12px}
+  body.has-badge #bossBar{bottom:262px}
+  #bsay{font-size:12.5px;padding:6px 10px;white-space:normal;max-width:62vw;text-align:center}
   #help{align-items:flex-end}
   #help .helpBox{width:100vw;max-height:86vh;border-radius:16px 16px 0 0;padding:14px 14px 18px}
   table.keys{font-size:12px}table.keys td:first-child{width:46%}ul.tips{font-size:12px}
@@ -177,11 +188,13 @@ body.has-badge .lb.bot{align-items:flex-start;padding-top:2vh}
   <div id="upBox" class="panel"></div>
   <div id="hint">点海面甩钩，把漂过来的东西捞上来</div>
   <div id="buildBar" class="panel"></div>
+  <div id="bossBar"><div id="bossName"></div><div class="btrack"><div id="bossFill"></div></div></div>
   <div id="banner"><div class="t"></div><div class="s"></div></div>
   <div id="paused" class="panel">已暂停 · 按空格继续</div>
 </div>
 <div id="floats"></div>
 <div id="say"></div>
+<div id="bsay"></div>
 
 <div id="start" class="overlay show">
   <div class="ovBox">

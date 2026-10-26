@@ -52,6 +52,9 @@ A.setSel(null); log.push('阿水='+A.npcs.length);
 collect(A.spawnDebris('sword',0)); collect(A.spawnDebris('cat',0)); log.push('尚方宝剑='+!!G.sword+' 哈吉米='+cats.length);
 A.spawnShark(true); for(let k=0;k<1500;k++){ step(0.05); if(G.over) break; }
 log.push('天数='+G.day+' 结束='+G.over);
+// Boss：四个都刷一遍，跑一会儿再打死，看奖励和有没有报错
+for(const d of [5,10,15,20]){ const b=spawnBossForDay(d); for(let k=0;k<300;k++){ step(0.05); if(G.over) break; } if(G.over) break; damageShark(b,9999,true); for(let k=0;k<60;k++) step(0.05); }
+log.push('Boss 胜='+(G.bossWins||0)+' 炮弹残留='+cannonballs.length+' 结束='+G.over);
 const w=G.res.wood; A.setSel('demolish'); const t=[...A.tiles.values()].find(t=>t.b&&t.b.type==='house'); A.onClickWorld({x:t.x,z:t.z}); A.setSel(null);
 log.push('拆除返还木头='+(G.res.wood-w));
 save(); const v1=[...A.tiles.values()].map(t=>t.b?t.b.v:'').join(); loadGame(readSave()); const v2=[...A.tiles.values()].map(t=>t.b?t.b.v:'').join();
