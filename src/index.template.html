@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>疯狂水世界 · 自己做的广告还原版</title>
+<style>
+:root{--glass:rgba(16,24,34,.62);--line:rgba(255,255,255,.1);--text:#F5F5F7;--t2:rgba(255,255,255,.64);--t3:rgba(255,255,255,.4);--accent:#FFC53D;--r:14px;--ease:cubic-bezier(.2,.8,.2,1)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;background:#0f1d33;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);user-select:none;-webkit-user-select:none}
+canvas{display:block;touch-action:none}
+.panel{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:var(--r)}
+#hud{position:fixed;inset:0;pointer-events:none}
+#hud .panel,#hud button,#hud .card{pointer-events:auto}
+#dayBox{position:absolute;left:20px;top:20px;padding:14px 16px;width:220px}
+#dayNum{font-size:34px;font-weight:900;line-height:1;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+#dayNum small{font-size:15px;font-weight:600;color:var(--t2);margin-left:4px}
+#tierName{font-size:13px;color:var(--t2);margin-top:6px}
+.bar{margin-top:10px}.bar .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--t2);margin-bottom:4px;font-variant-numeric:tabular-nums}
+.track{height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}.fill{height:100%;border-radius:3px}
+#bw .fill{background:#4FC3F7}#bf .fill{background:#FFB74D}#bh .fill{background:#EF5350}
+.low .lbl{color:#ff8a80}.low .track{animation:blink .8s infinite}
+@keyframes blink{50%{opacity:.35}}
+#resBox{position:absolute;left:50%;top:20px;transform:translateX(-50%);display:flex;padding:4px}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.chip.sep{border-left:1px solid var(--line)}.chip .i{font-size:16px}.chip.dim{color:var(--t2);font-weight:600}
+#topR{position:absolute;right:20px;top:20px;display:flex;gap:8px}
+.iconBtn{width:40px;height:40px;border-radius:12px;background:var(--glass);border:1px solid var(--line);color:var(--text);font-size:17px;cursor:pointer;backdrop-filter:blur(14px)}
+#upBox{position:absolute;right:20px;top:72px;width:230px;padding:14px 16px}
+#upBox h4{font-size:12px;color:var(--t3);font-weight:600}#upBox .nm{font-size:20px;font-weight:800;margin:2px 0 10px}
+#upBox .unlock{font-size:12px;color:var(--t3);margin-top:8px;line-height:1.5}
+.req{display:flex;justify-content:space-between;font-size:13px;color:var(--t2);padding:3px 0;font-variant-numeric:tabular-nums}
+.req.ok{color:var(--text)}.req.ok .v::after{content:' ✓';color:#7CDB8A}
+.primary{width:100%;margin-top:12px;height:40px;border:0;border-radius:10px;background:var(--accent);color:#1D1D1F;font-weight:800;font-size:15px;cursor:pointer;transition:transform .15s var(--ease)}
+.primary:disabled{background:rgba(255,255,255,.12);color:var(--t3);cursor:not-allowed}
+.primary:not(:disabled):hover{transform:translateY(-1px)}
+.primary.ready{animation:glow 1.4s infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(255,197,61,.6)}50%{box-shadow:0 0 0 6px rgba(255,197,61,0)}}
+#buildBar{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;gap:4px;padding:6px;max-width:calc(100vw - 40px);overflow-x:auto}
+.card{width:82px;flex:none;padding:8px 4px 7px;border-radius:10px;text-align:center;cursor:pointer;border:1px solid transparent;position:relative;transition:background .15s}
+.card:hover{background:rgba(255,255,255,.08)}.card.sel{background:rgba(255,197,61,.16);border-color:var(--accent)}
+.card .ic{font-size:24px;line-height:30px}.card .nm{font-size:12px;font-weight:700;margin-top:2px;white-space:nowrap}
+.card .cost{font-size:11px;color:var(--t2);margin-top:3px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.card.poor .cost{color:#ff8a80}.card.lock{opacity:.35;cursor:default}.card .key{position:absolute;left:6px;top:4px;font-size:10px;color:var(--t3)}
+.badge{position:absolute;right:4px;top:4px;background:var(--accent);color:#1d1d1f;font-size:10px;font-weight:800;padding:1px 5px;border-radius:6px}
+#hint{position:absolute;left:50%;bottom:122px;transform:translateX(-50%);font-size:13px;color:var(--t2);padding:6px 12px;border-radius:8px;background:rgba(16,24,34,.5);white-space:nowrap}
+#hint.warn{color:#ffd180}
+#hint.cancel{pointer-events:auto;cursor:pointer;color:var(--text);border:1px solid var(--accent)}
+#buildBar{touch-action:pan-x;-webkit-overflow-scrolling:touch}
+.touchOnly{display:none}
+@media (pointer:coarse){.touchOnly{display:inline}.mouseOnly{display:none}}
+#banner{position:absolute;left:50%;top:24%;transform:translate(-50%,-50%) scale(.9);text-align:center;opacity:0;transition:opacity .3s var(--ease),transform .4s var(--ease);white-space:nowrap}
+#banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#banner .t{font-size:44px;font-weight:900;color:var(--accent);text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 24px rgba(0,0,0,.35);letter-spacing:1px}
+#banner .t.red{color:#ff6b5b}
+#banner .s{font-size:16px;font-weight:600;margin-top:8px;text-shadow:0 1px 6px rgba(0,0,0,.7)}
+#paused{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;display:none;padding:14px 26px}
+.ft{position:absolute;font-size:15px;font-weight:800;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.7);transform:translate(-50%,-50%);pointer-events:none}
+.overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;overflow-y:auto;background:rgba(10,18,30,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.overlay.show{display:flex}
+.ovBox{text-align:center;transform:translateY(-4%)}
+.ovBox h1{font-size:72px;font-weight:900;letter-spacing:2px;line-height:1}.ovBox h1 em{color:var(--accent);font-style:normal}
+.ovBox h2{font-size:44px;font-weight:900;line-height:1.1}
+.ovBox .sub{font-size:16px;color:var(--t2);margin:12px 0 30px}
+.perks{display:grid;grid-template-columns:repeat(3,200px);gap:14px}
+.perk{padding:20px 16px;cursor:pointer;text-align:left;transition:transform .2s var(--ease),border-color .2s}
+.perk:hover{transform:translateY(-4px);border-color:var(--accent)}
+.perk .ic{font-size:34px}.perk .nm{font-size:18px;font-weight:800;margin-top:10px}.perk .ds{font-size:13px;color:var(--t2);margin-top:4px;line-height:1.5}
+.perk .tag{display:inline-block;margin-top:10px;font-size:11px;font-weight:700;color:#1d1d1f;background:var(--accent);padding:2px 7px;border-radius:5px}
+.qa{font-size:18px;font-weight:800;margin-bottom:14px}
+.howto{margin-top:26px;font-size:13px;color:var(--t3);line-height:1.9}
+.ghostBtn{margin-bottom:20px;height:40px;padding:0 22px;border-radius:10px;border:1px solid var(--accent);background:rgba(255,197,61,.12);color:var(--accent);font-weight:800;font-size:15px;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(4,110px);gap:10px;margin:0 auto 26px;width:max-content}
+.stats div{padding:12px 8px}.stats b{display:block;font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}.stats span{font-size:12px;color:var(--t2)}
+.ovBox .primary{width:220px}
+#floats{position:fixed;inset:0;pointer-events:none}
+#say{position:fixed;left:0;top:0;transform:translate(-50%,-100%) scale(.85);opacity:0;transition:opacity .2s,transform .25s cubic-bezier(.2,1.6,.4,1);pointer-events:none;background:#fff;color:#1d1d1f;font-size:15px;font-weight:800;padding:8px 14px;border-radius:12px;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.35);border:2px solid var(--accent)}
+#say.show{opacity:1;transform:translate(-50%,-100%) scale(1)}
+#say::after{content:'';position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);border-width:9px 7px 0;border-style:solid;border-color:var(--accent) transparent transparent}
+#cutFade{transition:none!important}
+.cut{position:fixed;inset:0;display:none;pointer-events:none}.cut.show{display:block}
+.lb{position:absolute;left:0;right:0;height:13vh;background:#0b0f14}.lb.top{top:0}.lb.bot{bottom:0;display:flex;align-items:center;justify-content:center}
+#cutSub{font-size:20px;font-weight:600;text-align:center;max-width:80vw;line-height:1.5}
+#cutWho{font-weight:900;margin-right:12px}
+#cutCard{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font-size:40px;font-weight:900;letter-spacing:6px;opacity:0;transition:opacity 1s var(--ease);text-shadow:0 2px 12px rgba(0,0,0,.6)}
+#cutCard.show{opacity:1}
+#cutCard small{display:block;font-size:15px;letter-spacing:2px;color:var(--t2);margin-top:10px;font-weight:600}
+#cutTitle{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(1.6);text-align:center;opacity:0;transition:opacity .25s,transform .35s cubic-bezier(.2,1.6,.4,1);white-space:nowrap}
+#cutTitle.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#cutTitle .t{font-size:72px;font-weight:900;color:var(--accent);text-shadow:0 4px 0 rgba(0,0,0,.4),0 0 30px rgba(0,0,0,.4)}
+#cutTitle .s{font-size:22px;font-weight:700;margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.7)}
+#cutSkip{position:absolute;right:24px;top:3.5vh;pointer-events:auto;height:36px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:var(--text);font-size:14px;font-weight:700;cursor:pointer}
+#cutFade{position:absolute;inset:0;background:#0b0f14;opacity:0;transition:opacity .5s}
+.linkBtn{margin-top:18px;background:none;border:0;color:var(--t2);font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.corner{position:fixed;left:20px;bottom:16px;font-size:11px;color:var(--t3)}
+/* ---------- 手机 / 小屏 ---------- */
+@media (max-width: 760px), (max-height: 520px) {
+  #dayBox{left:8px;top:8px;width:142px;padding:9px 10px}
+  #dayNum{font-size:22px}#dayNum small{font-size:12px}
+  #tierName{font-size:10.5px;margin-top:4px;line-height:1.35}
+  .bar{margin-top:6px}.bar .lbl{font-size:10.5px;margin-bottom:2px}.track{height:4px}
+  #topR{right:8px;top:8px;gap:6px}.iconBtn{width:32px;height:32px;border-radius:10px;font-size:14px}
+  #upBox{right:8px;top:46px;width:150px;padding:9px 10px}
+  #upBox h4{font-size:10px}#upBox .nm{font-size:14px;margin:0 0 4px}
+  #upBox .req{font-size:11px;padding:1px 0}#upBox .unlock{display:none}
+  #upBox .primary{height:32px;font-size:12px;margin-top:6px}
+  #resBox{top:auto;bottom:86px;padding:2px}
+  .chip{font-size:12px;padding:4px 7px;gap:3px}.chip .i{font-size:13px}
+  #buildBar{bottom:8px;max-width:calc(100vw - 16px);padding:4px;gap:2px}
+  .card{width:62px;padding:6px 2px 5px}.card .ic{font-size:19px;line-height:24px}
+  .card .nm{font-size:10px}.card .cost{font-size:9.5px}.card .key{display:none}.badge{font-size:9px;padding:0 4px}
+  #hint{bottom:124px;font-size:11px;padding:5px 10px;white-space:normal;text-align:center;max-width:92vw}
+  #banner{top:30%;white-space:normal;width:92vw}
+  #banner .t{font-size:26px}#banner .s{font-size:13px}
+  #paused{font-size:18px}
+  .ft{font-size:12px}
+  #say{font-size:12.5px;padding:6px 10px;white-space:normal;max-width:62vw;text-align:center}
+  .ovBox{padding:24px 0;transform:none}
+  .ovBox h1{font-size:44px}.ovBox h2{font-size:24px;padding:0 16px}
+  .ovBox .sub{font-size:13px;margin:8px 16px 18px}
+  .qa{font-size:15px;margin-bottom:10px}
+  .perks{grid-template-columns:1fr;width:min(92vw,360px);margin:0 auto;gap:8px}
+  .perk{padding:10px 14px;display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:center}
+  .perk .ic{font-size:26px;grid-row:span 3}.perk .nm{font-size:15px;margin-top:0}.perk .ds{font-size:11.5px;margin-top:2px}
+  .perk .tag{margin-top:4px;justify-self:start}
+  .howto{font-size:11px;margin:16px 16px 0;line-height:1.7}
+  .stats{grid-template-columns:repeat(2,120px)}
+  .corner{display:none}
+  .lb{height:10vh}#cutSub{font-size:14px;max-width:92vw}#cutWho{display:block;margin:0 0 2px}
+  #cutCard{font-size:24px;letter-spacing:3px;white-space:nowrap}
+  #cutTitle .t{font-size:36px}#cutTitle .s{font-size:14px}
+  #cutSkip{top:2vh;right:10px;height:30px;font-size:12px}
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  #resBox{bottom:84px}#hint{bottom:122px}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud" style="display:none">
+  <div id="dayBox" class="panel">
+    <div id="dayNum">第 1 <small>天</small></div>
+    <div id="tierName">破木筏 · 白天</div>
+    <div class="bar" id="bw"><div class="lbl"><span>💧 淡水</span><span class="v">100</span></div><div class="track"><div class="fill"></div></div></div>
+    <div class="bar" id="bf"><div class="lbl"><span>🍖 食物</span><span class="v">100</span></div><div class="track"><div class="fill"></div></div></div>
+    <div class="bar" id="bh"><div class="lbl"><span>❤️ 生命</span><span class="v">100</span></div><div class="track"><div class="fill"></div></div></div>
+  </div>
+  <div id="resBox" class="panel"></div>
+  <div id="topR"><button class="iconBtn" id="muteBtn" title="声音">🔊</button><button class="iconBtn" id="pauseBtn" title="暂停 (空格)">⏸</button></div>
+  <div id="upBox" class="panel"></div>
+  <div id="hint">点海面甩钩，把漂过来的东西捞上来</div>
+  <div id="buildBar" class="panel"></div>
+  <div id="banner"><div class="t"></div><div class="s"></div></div>
+  <div id="paused" class="panel">已暂停 · 按空格继续</div>
+</div>
+<div id="floats"></div>
+<div id="say"></div>
+
+<div id="start" class="overlay show">
+  <div class="ovBox">
+    <h1>疯狂<em>水世界</em></h1>
+    <div class="sub">陆地全淹了，开局一块破木筏 · 三分钟一局，巨爽巨解压</div>
+    <button id="continueBtn" class="ghostBtn" style="display:none"></button>
+    <div class="qa">快问快答：开局要选什么？</div>
+    <div class="perks">
+      <div class="perk panel" data-perk="filter"><div class="ic">💧</div><div class="nm">海水过滤器</div><div class="ds">有了它，高级庇护所随便搬，人生一键重启</div><span class="tag">开局一定要选</span></div>
+      <div class="perk panel" data-perk="urine"><div class="ic">🧪</div><div class="nm">尿液过滤器</div><div class="ds">传了三代的祖传老物件，主打自产自销、循环利用</div></div>
+      <div class="perk panel" data-perk="toilet"><div class="ic">🚽</div><div class="nm">黄金马桶</div><div class="ds">看着气派，喝不了水。开局多送 15 废铁 10 木头</div></div>
+    </div>
+    <button class="linkBtn" id="replayBtn">▶ 看开场剧情</button>
+    <div class="howto">你是肥强 · 点海面甩钩 · 点远处肥强坐红色澡盆出海扫货 · 点鲨鱼扎它 · 咬坏的木板点一下就能修<br><span class="mouseOnly">选下面的建筑再点木筏建造 · 拖动转视角 · 滚轮缩放 · 数字键选建筑 · 右键/Esc 取消 · 空格暂停</span><span class="touchOnly">选下面的建筑再点亮起的格子 · 单指拖动转视角 · 双指缩放</span></div>
+  </div>
+  <div class="corner">单机网页版 · 进度自动保存在这台电脑的浏览器里 · No more fake ads</div>
+</div>
+
+<div id="over" class="overlay">
+  <div class="ovBox">
+    <h2 id="overTitle">你在第 7 天沉没了</h2>
+    <div class="sub" id="overSub">木筏被鲨鱼啃光了</div>
+    <div class="stats" id="overStats"></div>
+    <button class="primary" id="overBtn">再来一局</button>
+  </div>
+</div>
+
+<div id="cut" class="cut">
+  <div class="lb top"></div>
+  <div class="lb bot"><div id="cutSub"><span id="cutWho"></span><span id="cutLine"></span></div></div>
+  <div id="cutCard">陆地沉没的第三年<small>THE WORLD IS UNDERWATER</small></div>
+  <div id="cutTitle"><div class="t">疯狂水世界，启动！</div><div class="s">三分钟一局，巨爽巨解压</div></div>
+  <button id="cutSkip">跳过 ▶▶</button>
+  <div id="cutFade"></div>
+</div>
+
+<script>/*__THREE__*/</script>
+<script>/*__GAME__*/</script>
+</body>
+</html>
