@@ -29,7 +29,9 @@ PANEL = r"""
 <h5>🎬 演示面板</h5>
 <button data-a="mid">🔄 中期存档（简易庇护所）</button>
 <button data-a="city">🏙️ 满级城市（各种豪宅）</button>
-<h5>Boss</h5>
+<button data-a="big">🧪 不规则大木筏（测停靠/视角/海浪）</button>
+<button data-a="far">🧪 远处漂来物资（测坐骑追物）</button>
+<h5>Boss（直接出现在跟前）</h5>
 <button data-a="b5">💪 肌肉佬 · 翡翠蟹</button>
 <button data-a="b10">💰 王总 · 收租船</button>
 <button data-a="b15">🦈 深海巨兽</button>
@@ -59,6 +61,14 @@ PANEL = r"""
   const A = window.__G;
   const near = (type) => { const d = A.spawnDebris(type, 0); d.x = A.raftC.x + 7; d.z = A.raftC.z + 1; d.g.position.set(d.x, 0, d.z); };
   const fill = () => { const G = A.G; G.res.wood = G.res.plastic = G.res.scrap = 999; G.water = G.food = G.hp = 100; };
+  // Boss 直接放到跟前，不用等它游过来
+  const near5 = (day) => {
+    const s = spawnBossForDay(day), ang = 0.4, R = (s.kind ? bossAnchorR(s.kind, ang) : raftR + 5);
+    s.ang = ang; s.r = R; s.x = A.raftC.x + Math.cos(ang) * R; s.z = A.raftC.z + Math.sin(ang) * R;
+    if (s.kind === 'rent' || s.kind === 'warship') { s.state = 'anchor'; s.timer = 1.5; }
+    if (s.kind === 'crab') { s.state = 'circle'; s.timer = 1; }
+    if (s.kind) bossArrived(s);
+  };
   const build = (types) => { types.forEach(k => { for (const t of A.tiles.values()) if (!t.b) { A.setSel(k); A.tryPlace(t.x, t.z); break; } }); A.setSel(null); };
   function mid() {
     A.newGame('filter'); fill(); const G = A.G;
@@ -74,7 +84,15 @@ PANEL = r"""
   }
   const ACT = {
     mid, city,
-    b5: () => spawnBossForDay(5), b10: () => spawnBossForDay(10), b15: () => spawnBossForDay(15), b20: () => spawnBossForDay(20),
+    b5: () => near5(5), b10: () => near5(10), b15: () => near5(15), b20: () => near5(20),
+    big() {
+      A.newGame('filter'); fill(); G.weather = 'overcast';
+      A.setSel('floor');
+      for (const [x, z] of [[2,0],[3,0],[4,0],[5,0],[5,1],[5,2],[5,3],[6,3],[7,3],[-1,1],[-2,1],[-3,1],[-3,2],[-3,3],[-4,3],[0,2],[1,2],[1,3],[1,4],[2,4],[3,4]]) A.tryPlace(x, z);
+      A.setSel(null); fill(); A.upgrade(); fill();
+      build(['house', 'grill', 'net', 'planter']); G.t = 2 * 40 + 6; fill();
+    },
+    far() { for (let i = 0; i < 4; i++) { const d = A.spawnDebris(['barrel', 'wood', 'plastic', 'scrap'][i], 0); d.x = A.raftC.x + 18 + i * 2; d.z = A.raftC.z + (i - 1.5) * 3; d.g.position.set(d.x, 0, d.z); } hint('点那几个远处的物资，看澡盆会不会追过去'); hintLock = 4; },
     kill: () => sharks.filter(s => !s.dead && (s.kind || s.boss)).forEach(s => damageShark(s, 99999, true)),
     sword: () => near('sword'), cat: () => near('cat'), goldbar: () => near('goldbar'), gold: () => near('gold'),
     storm: () => { A.G.weather = 'storm'; }, clear: () => { A.G.weather = 'overcast'; },

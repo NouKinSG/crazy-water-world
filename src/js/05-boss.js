@@ -98,7 +98,20 @@ function spawnBossForDay(day) {
   setTimeout(() => G && !G.over && banner(info.banner[0], info.banner[1], 'red'), 2400);
   return s;
 }
-function bossAnchorR(kind) { return raftR + (kind === 'warship' ? 7 : kind === 'rent' ? 4.5 : 4); }
+// 沿 Boss 所在方向找木筏的外沿：只看这条方向上的地板，别处拉了长条也不会把 Boss 推远
+function edgeR(ang) {
+  const cx = Math.cos(ang), cz = Math.sin(ang); let best = 0;
+  tiles.forEach(t => { const dx = t.x - raftC.x, dz = t.z - raftC.z, p = dx * cx + dz * cz;
+    if (p > best && Math.abs(dz * cx - dx * cz) < 1.6) best = p; });
+  return best + 0.7;
+}
+const BOSS_GAP = { warship: 6, rent: 3.5, crab: 3.5 };
+function bossAnchorR(kind, ang) { return edgeR(ang) + BOSS_GAP[kind]; }
+// 停泊点随木筏变化平滑挪过去，不瞬移
+function holdAnchor(s, dt) {
+  const R = bossAnchorR(s.kind, s.ang);
+  moveToward(s, raftC.x + Math.cos(s.ang) * R, raftC.z + Math.sin(s.ang) * R, 4, dt); faceRaft(s);
+}
 function moveToward(s, tx, tz, spd, dt) {
   const dx = tx - s.x, dz = tz - s.z, d = Math.hypot(dx, dz);
   if (d > 0.01) { const k = Math.min(d, spd * dt) / d; s.x += dx * k; s.z += dz * k; s.g.rotation.y = Math.atan2(-dz, dx); }
@@ -116,7 +129,7 @@ function bossArrived(s) {
 const BOSS_AI = {
   // 肌肉佬：绕着木筏转，冲过来把边上的空地板直接推走（有建筑的格子就砸 2 点耐久）
   crab(s, dt) {
-    const R = bossAnchorR('crab');
+    const R = bossAnchorR('crab', s.ang);
     if (s.state === 'come' || s.state === 'circle') {
       s.r = lerp(s.r, R, Math.min(1, dt * 0.5)); s.ang += s.dir * s.speed / Math.max(s.r, 1) * dt;
       moveToward(s, raftC.x + Math.cos(s.ang) * s.r, raftC.z + Math.sin(s.ang) * s.r, 99, dt);
@@ -145,35 +158,28 @@ const BOSS_AI = {
     } else if (s.state === 'retreat') {
       const dx = s.x - raftC.x, dz = s.z - raftC.z, d = Math.hypot(dx, dz) || 1;
       moveToward(s, raftC.x + dx / d * (R + 1), raftC.z + dz / d * (R + 1), s.speed * 1.2, dt);
-      if (d >= R) { s.r = d; s.ang = Math.atan2(dz, dx); s.state = 'circle'; s.timer = rand(6, 8.5); }
+      if (d >= R || bossAnchorR('crab', Math.atan2(dz, dx)) <= d) { s.r = d; s.ang = Math.atan2(dz, dx); s.state = 'circle'; s.timer = rand(6, 8.5); }
     }
     s.g.position.set(s.x, waveH(s.x, s.z, T) - 0.35, s.z);
   },
   // 王总：开到旁边停下，每 4 秒收一次床位费
   rent(s, dt) {
-    const R = bossAnchorR('rent');
-    if (s.state === 'leave') {   // 收够了就开走，不给奖励
-      const dx = s.x - raftC.x, dz = s.z - raftC.z, d = Math.hypot(dx, dz) || 1;
-      s.x += dx / d * 5 * dt; s.z += dz / d * 5 * dt; faceRaft(s); s.g.rotation.y += Math.PI;
-      if (d > raftR + 34) s.gone = true;
-      s.g.position.set(s.x, waveH(s.x, s.z, T) * 0.5, s.z); return;
-    }
+    const R = bossAnchorR('rent', s.ang);
     if (s.state === 'come') {
       if (moveToward(s, raftC.x + Math.cos(s.ang) * R, raftC.z + Math.sin(s.ang) * R, s.speed, dt) < 0.3) { s.state = 'anchor'; s.timer = 3; bossArrived(s); }
     } else {
-      s.x = raftC.x + Math.cos(s.ang) * R; s.z = raftC.z + Math.sin(s.ang) * R; faceRaft(s);
+      holdAnchor(s, dt);
       s.timer -= dt;
+      // 收满 24 就不再收，停在边上等你打——打沉了照样连本带利拿回来
       if ((s.taken || 0) >= 24) {
-        s.state = 'leave'; bossSay(s, '这个月收够了，下个月再来！', 2.5); floatText(new THREE.Vector3(s.x, 2.2, s.z), '王总收够钱走了', '#ff8a80', 2);
-        qsay('总算走了……', 2.5, true); return;
-      }
-      if (s.timer <= 0) {
+        if (!s.full) { s.full = true; bossSay(s, '这个月收够了，有本事来拿回去！', 2.5); qsay('收够了还不走？打沉他把钱拿回来！', 3, true); }
+      } else if (s.timer <= 0) {
         s.timer = 6;
         const take = { wood: Math.min(G.res.wood, 3), plastic: Math.min(G.res.plastic, 2), scrap: Math.min(G.res.scrap, 1) };
         s.taken = (s.taken || 0) + take.wood + take.plastic + take.scrap + 2;
         const total = take.wood + take.plastic + take.scrap;
         Object.keys(take).forEach(r => { G.res[r] -= take[r]; s.loot[r] += take[r]; });
-        const at = new THREE.Vector3(raftC.x, 1.6, raftC.z);
+        const near = nearestTile(new THREE.Vector3(s.x, 0, s.z), false), at = near ? tileWorld(near, 1.6) : new THREE.Vector3(raftC.x, 1.6, raftC.z);
         if (total) floatText(at, `床位费 -${take.wood}🪵 -${take.plastic}🧴 -${take.scrap}⚙️`, '#ff8a80', 1.6);
         else { G.water = Math.max(0, G.water - 6); floatText(at, '没钱？拿水抵！-6 💧', '#ff8a80', 1.6); }
         sfx('no'); bossSay(s, BOSS_LINES.rent[randi(0, 2)], 2.2);
@@ -183,11 +189,11 @@ const BOSS_AI = {
   },
   // 老板：远远停下，每 3.2 秒朝木筏开一炮
   warship(s, dt) {
-    const R = bossAnchorR('warship');
+    const R = bossAnchorR('warship', s.ang);
     if (s.state === 'come') {
       if (moveToward(s, raftC.x + Math.cos(s.ang) * R, raftC.z + Math.sin(s.ang) * R, s.speed, dt) < 0.3) { s.state = 'anchor'; s.timer = 2.5; bossArrived(s); }
     } else {
-      s.x = raftC.x + Math.cos(s.ang) * R; s.z = raftC.z + Math.sin(s.ang) * R; faceRaft(s);
+      holdAnchor(s, dt);
       s.timer -= dt;
       if (s.timer <= 0 && tiles.size) {
         s.timer = 4.5;
