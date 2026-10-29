@@ -354,13 +354,18 @@ function updateLighting() {
   scene.background.copy(_c); scene.fog.color.copy(_c);
   scene.fog.near = lerp(40, 16, wStorm); scene.fog.far = lerp(110, 62, wStorm);
   sun.intensity = (0.18 + 0.95 * k) * (1 - wStorm * 0.55) + flash * 1.2; sun.color.setHex(k > 0.5 ? 0xfff1d6 : 0x9fb8ff);
-  hemi.intensity = (0.32 + 0.5 * k) * (1 - wStorm * 0.3) + flash * 1.4;
+  hemi.intensity = (0.46 + 0.36 * k) * (1 - wStorm * 0.3) + flash * 1.4;
   _c.copy(OCEAN_DAY).lerp(OCEAN_STORM, wStorm);
   oceanMat.color.copy(OCEAN_NIGHT).lerp(_c, k);
   const nk = 1 - k;
   WINDOW_MATS.forEach(m => m.emissiveIntensity = nk * 1.1); GLOW.lantern.emissiveIntensity = 0.3 + nk; GLOW.coal.emissiveIntensity = 0.9 + nk * 0.6;
   GLOW.water.emissiveIntensity = 0.25 + nk * 0.7; GLOW.eel.emissiveIntensity = 0.6 + nk * 0.9; GLOW.laser.emissiveIntensity = 0.8 + nk * 0.8;
-  LH_BEAM_MAT.opacity = nk * 0.09;
+  // 灯塔照亮周围海面：挨得近的只亮一片，免得叠成一团
+  SEA_POOL_MAT.opacity = nk * 0.42;
+  const shown = [];
+  tiles.forEach(t => { if (!t.b || !t.b.sea) return;
+    t.b.sea.visible = nk > 0.02 && !shown.some(o => Math.hypot(o.x - t.x, o.z - t.z) < LH_SEA_R * 1.2);
+    if (t.b.sea.visible) shown.push(t); });
   // 豪宅区本身有窗灯和发光地板，再加光斑和点光源会过曝，只给前面几个阶段补光
   const lampK = G && G.tier >= 4 ? 0 : nk;
   for (const c in POOL_MATS) POOL_MATS[c].opacity = lampK * 0.3;

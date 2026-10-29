@@ -36,7 +36,7 @@ function reskin() { tiles.forEach(t => { t.floor.material.dispose(); t.floor.mat
 function placeBuilding(t, type, v, free) {
   if (v == null) v = randi(0, 999);
   const g = BUILDERS[type](v); g.position.y = 0.3; g.rotation.y = type === 'net' ? 0 : (v % 4) * Math.PI / 2; addLightPool(g, type);
-  t.g.add(g); t.b = { type, g, v, free: !!free, cd: rand(0, 1), head: g.userData.head, spin: g.userData.spin, spin2: g.userData.spin2 };
+  t.g.add(g); t.b = { type, g, v, free: !!free, cd: rand(0, 1), sea: g.userData.sea, head: g.userData.head, spin: g.userData.spin, spin2: g.userData.spin2 };
 }
 function removeBuilding(t) { t.g.remove(t.b.g); t.b = null; }
 function neighbors(x, z) { return [[x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]]; }
@@ -421,6 +421,7 @@ function gameUpdate(dt) {
   saveTimer -= dt; if (saveTimer <= 0) { saveTimer = 5; save(); }
 }
 let saveTimer = 5;
+
 
 // ---------- 拆除：全额返还 ----------
 function tryDemolish(x, z) {

@@ -173,7 +173,7 @@ const OCEAN = 260, SEG = IS_TOUCH ? 72 : 120, CELL = OCEAN / SEG;
 const oceanGeo = new THREE.PlaneGeometry(OCEAN, OCEAN, SEG, SEG);
 oceanGeo.rotateX(-Math.PI / 2);
 const oceanBase = oceanGeo.attributes.position.array.slice();
-const OCEAN_DAY = new THREE.Color(0x22505c), OCEAN_NIGHT = new THREE.Color(0x0a2230), OCEAN_STORM = new THREE.Color(0x1d4450);
+const OCEAN_DAY = new THREE.Color(0x22505c), OCEAN_NIGHT = new THREE.Color(0x143a4c), OCEAN_STORM = new THREE.Color(0x1d4450);
 const oceanMat = new THREE.MeshStandardMaterial({ color: 0x22505c, roughness: 0.55, metalness: 0, flatShading: true });
 const ocean = new THREE.Mesh(oceanGeo, oceanMat);
 ocean.receiveShadow = true; ocean.frustumCulled = false;
@@ -274,9 +274,12 @@ function addLightPool(g, type) {
   const m = POOL_MATS[spec[0]] || (POOL_MATS[spec[0]] = new THREE.MeshBasicMaterial({ color: spec[0], map: TEX.pool, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   const p = new THREE.Mesh(POOL_GEO, m); p.scale.setScalar(spec[1] * 2); p.position.y = 0.02; p.renderOrder = 1; g.add(p);
+  // 灯塔：在海面高度铺一大片光（木筏地板会挡住，只照亮周围的海），夜里看得清附近的鲨鱼和物资
+  if (type === 'lighthouse') { const s = new THREE.Mesh(POOL_GEO, SEA_POOL_MAT); s.scale.setScalar(LH_SEA_R * 2); s.position.y = -0.27; g.add(s); g.userData.sea = s; }
 }
+const LH_SEA_R = 7;
+const SEA_POOL_MAT = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, map: TEX.pool, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
 const LAMPS = [0, 1, 2, 3].map(() => { const l = new THREE.PointLight(0xffd27a, 0, 6, 1.6); scene.add(l); return l; });
-const LH_BEAM_MAT = new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0, fog: false, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 const NET_MAT = new THREE.MeshStandardMaterial({ map: TEX.net, transparent: true, side: THREE.DoubleSide, alphaTest: 0.3 });
 const GHOST_OK = new THREE.MeshBasicMaterial({ color: 0x7cdb8a, transparent: true, opacity: 0.45, depthWrite: false });
 const GHOST_NO = new THREE.MeshBasicMaterial({ color: 0xff5252, transparent: true, opacity: 0.35, depthWrite: false });
@@ -436,10 +439,6 @@ const BUILDERS = {
       mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.5, 10), mat(0xf5f5f5), 0, 1.65, 0),
       mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.26, 10), GLOW.lantern, 0, 2.03, 0),
       mesh(new THREE.ConeGeometry(0.22, 0.25, 10), mat(0xe53935), 0, 2.3, 0));
-    // 旋转的探照光束：两道对向的扁锥，晚上才看得见
-    const beam = new THREE.Group(); beam.position.y = 2.03;
-    [1, -1].forEach(d => { const c = new THREE.Mesh(new THREE.ConeGeometry(0.9, 9, 16, 1, true), LH_BEAM_MAT); c.rotation.z = d * Math.PI / 2; c.position.x = -d * 4.5; c.scale.z = 0.35; beam.add(c); });
-    g.add(beam); g.userData.spin2 = beam;
     return g;
   },
 };
