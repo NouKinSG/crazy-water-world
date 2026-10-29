@@ -2,10 +2,10 @@
 // 第 5 天肌肉佬骑翡翠蟹（推走外墙）→ 第 10 天王总收租船（扣床位费）→ 第 15 天深海巨兽 → 第 20 天老板的黄金战舰（开炮），之后轮流再来、血更厚
 const BOSS_ORDER = ['crab', 'rent', 'beast', 'warship'];
 const BOSS_INFO = {
-  crab:    { name: '肌肉佬 · 翡翠蟹', hp: 34, banner: ['肌肉佬骑着翡翠蟹来了！', '他要把你木筏边上的空地板推走'], say: '这墙挡我视线了，推了！', reply: '肌肉佬，你怎么把我的外墙都吸走？', h: 2.8 },
-  rent:    { name: '王总 · 收租船', hp: 46, banner: ['王总的收租船来了！', '不打沉它，它会一直收你的床位费'], say: '怎么这么快就到期了？交床位费！', reply: '我都给你免费修了二年半的庇护所了！', h: 2.4 },
+  crab:    { name: '肌肉佬 · 翡翠蟹', hp: 28, banner: ['肌肉佬骑着翡翠蟹来了！', '他要把你木筏边上的空地板推走'], say: '这墙挡我视线了，推了！', reply: '肌肉佬，你怎么把我的外墙都吸走？', h: 2.8 },
+  rent:    { name: '王总 · 收租船', hp: 32, banner: ['王总的收租船来了！', '快打沉它！不然它会收走一笔床位费'], say: '怎么这么快就到期了？交床位费！', reply: '我都给你免费修了二年半的庇护所了！', h: 2.4 },
   beast:   { name: '深海巨兽', hp: 60, banner: ['深海巨兽出现了！', '它一口能咬掉 3 点耐久'], say: '', reply: '这么大一条？！', h: 2.6 },
-  warship: { name: '老板 · 黄金战舰', hp: 90, banner: ['庇护所老板的黄金战舰来了！', '当年把你踢出门的人，开着战舰来了'], say: '连个海水过滤器都没有，也配住豪宅？', reply: '老板，三十年河东，三十年河西！', h: 3.2 },
+  warship: { name: '老板 · 黄金战舰', hp: 70, banner: ['庇护所老板的黄金战舰来了！', '当年把你踢出门的人，开着战舰来了'], say: '连个海水过滤器都没有，也配住豪宅？', reply: '老板，三十年河东，三十年河西！', h: 3.2 },
 };
 const BOSS_LINES = {
   crab: ['推了推了，挡我光了', '这块地归我了', '健身的人力气大，没办法'],
@@ -132,7 +132,7 @@ const BOSS_AI = {
       if (!t || !tiles.has(key(t.x, t.z))) { s.state = 'retreat'; return; }
       if (moveToward(s, t.x, t.z, s.speed * 1.6, dt) < 2.0) {
         sfx('thud'); shake(0.45);
-        if (!t.b && tiles.size > 6) {
+        if (!t.b && tiles.size > 8) {
           puff(tileWorld(t), 0x8d5a2b, 12); floatText(tileWorld(t, 1.2), '外墙被推走了！', '#ff6b5b', 2);
           removeTile(t); recount(); bossSay(s, BOSS_LINES.crab[randi(0, 2)], 2.5);
           qsayKey('crabpush', 8, ['肌肉佬，你怎么把我的外墙都吸走？', '我的地板！'], true);
@@ -145,26 +145,37 @@ const BOSS_AI = {
     } else if (s.state === 'retreat') {
       const dx = s.x - raftC.x, dz = s.z - raftC.z, d = Math.hypot(dx, dz) || 1;
       moveToward(s, raftC.x + dx / d * (R + 1), raftC.z + dz / d * (R + 1), s.speed * 1.2, dt);
-      if (d >= R) { s.r = d; s.ang = Math.atan2(dz, dx); s.state = 'circle'; s.timer = rand(3.5, 5.5); }
+      if (d >= R) { s.r = d; s.ang = Math.atan2(dz, dx); s.state = 'circle'; s.timer = rand(6, 8.5); }
     }
     s.g.position.set(s.x, waveH(s.x, s.z, T) - 0.35, s.z);
   },
   // 王总：开到旁边停下，每 4 秒收一次床位费
   rent(s, dt) {
     const R = bossAnchorR('rent');
+    if (s.state === 'leave') {   // 收够了就开走，不给奖励
+      const dx = s.x - raftC.x, dz = s.z - raftC.z, d = Math.hypot(dx, dz) || 1;
+      s.x += dx / d * 5 * dt; s.z += dz / d * 5 * dt; faceRaft(s); s.g.rotation.y += Math.PI;
+      if (d > raftR + 34) s.gone = true;
+      s.g.position.set(s.x, waveH(s.x, s.z, T) * 0.5, s.z); return;
+    }
     if (s.state === 'come') {
       if (moveToward(s, raftC.x + Math.cos(s.ang) * R, raftC.z + Math.sin(s.ang) * R, s.speed, dt) < 0.3) { s.state = 'anchor'; s.timer = 3; bossArrived(s); }
     } else {
       s.x = raftC.x + Math.cos(s.ang) * R; s.z = raftC.z + Math.sin(s.ang) * R; faceRaft(s);
       s.timer -= dt;
+      if ((s.taken || 0) >= 24) {
+        s.state = 'leave'; bossSay(s, '这个月收够了，下个月再来！', 2.5); floatText(new THREE.Vector3(s.x, 2.2, s.z), '王总收够钱走了', '#ff8a80', 2);
+        qsay('总算走了……', 2.5, true); return;
+      }
       if (s.timer <= 0) {
-        s.timer = 4;
-        const take = { wood: Math.min(G.res.wood, 4), plastic: Math.min(G.res.plastic, 3), scrap: Math.min(G.res.scrap, 2) };
+        s.timer = 6;
+        const take = { wood: Math.min(G.res.wood, 3), plastic: Math.min(G.res.plastic, 2), scrap: Math.min(G.res.scrap, 1) };
+        s.taken = (s.taken || 0) + take.wood + take.plastic + take.scrap + 2;
         const total = take.wood + take.plastic + take.scrap;
         Object.keys(take).forEach(r => { G.res[r] -= take[r]; s.loot[r] += take[r]; });
         const at = new THREE.Vector3(raftC.x, 1.6, raftC.z);
         if (total) floatText(at, `床位费 -${take.wood}🪵 -${take.plastic}🧴 -${take.scrap}⚙️`, '#ff8a80', 1.6);
-        else { G.water = Math.max(0, G.water - 10); floatText(at, '没钱？拿水抵！-10 💧', '#ff8a80', 1.6); }
+        else { G.water = Math.max(0, G.water - 6); floatText(at, '没钱？拿水抵！-6 💧', '#ff8a80', 1.6); }
         sfx('no'); bossSay(s, BOSS_LINES.rent[randi(0, 2)], 2.2);
       }
     }
@@ -179,7 +190,7 @@ const BOSS_AI = {
       s.x = raftC.x + Math.cos(s.ang) * R; s.z = raftC.z + Math.sin(s.ang) * R; faceRaft(s);
       s.timer -= dt;
       if (s.timer <= 0 && tiles.size) {
-        s.timer = 3.2;
+        s.timer = 4.5;
         const all = [...tiles.values()], t = all[randi(0, all.length - 1)];
         const ball = mesh(new THREE.SphereGeometry(0.22, 8, 6), mat(0x212121));
         ball.position.set(s.x, 1.6, s.z); scene.add(ball);

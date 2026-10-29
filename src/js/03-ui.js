@@ -131,10 +131,22 @@ function groundAt(cx, cy) {
   ray.setFromCamera(ndc, camera);
   const p = new THREE.Vector3(); return ray.ray.intersectPlane(plane, p) ? p : null;
 }
+const camPan = new THREE.Vector3(), panKeys = new Set();
+function camAxes() { return { fx: -Math.sin(cam.theta), fz: -Math.cos(cam.theta), rx: Math.cos(cam.theta), rz: -Math.sin(cam.theta) }; }
 function updateCamera(dt) {
-  const out = mount.g && mount.state !== 'dock' && !idle, fx_ = out ? lerp(raftC.x, mount.pos.x, 0.85) : raftC.x, fz_ = out ? lerp(raftC.z, mount.pos.z, 0.85) : raftC.z;
-  cam.tx = lerp(cam.tx, fx_, Math.min(1, dt * 2)); cam.tz = lerp(cam.tz, fz_, Math.min(1, dt * 2));
-  const dist = (12 + raftR * 2.1) * cam.zoom, el = 0.46;
+  // 镜头焦点：出海时跟坐骑，平时跟肥强；再叠加玩家手动平移的偏移
+  if (panKeys.size && !idle) {
+    const a = camAxes(), sp = dt * 12 * cam.zoom;
+    if (panKeys.has('f')) { camPan.x += a.fx * sp; camPan.z += a.fz * sp; }
+    if (panKeys.has('b')) { camPan.x -= a.fx * sp; camPan.z -= a.fz * sp; }
+    if (panKeys.has('r')) { camPan.x += a.rx * sp; camPan.z += a.rz * sp; }
+    if (panKeys.has('l')) { camPan.x -= a.rx * sp; camPan.z -= a.rz * sp; }
+  }
+  if (camPan.length() > raftR + 14) camPan.setLength(raftR + 14);
+  const out = mount.g && mount.state !== 'dock' && !idle;
+  const fx_ = (out ? mount.pos.x : idle ? raftC.x : avatar.position.x) + camPan.x, fz_ = (out ? mount.pos.z : idle ? raftC.z : avatar.position.z) + camPan.z;
+  cam.tx = lerp(cam.tx, fx_, Math.min(1, dt * 1.8)); cam.tz = lerp(cam.tz, fz_, Math.min(1, dt * 1.8));
+  const dist = (11 + Math.min(raftR, 6) * 1.4) * cam.zoom, el = 0.46;
   camera.position.set(cam.tx + dist * Math.cos(el) * Math.sin(cam.theta), dist * Math.sin(el), cam.tz + dist * Math.cos(el) * Math.cos(cam.theta));
   if (shakeAmt > 0) { camera.position.x += rand(-1, 1) * shakeAmt * 0.3; camera.position.y += rand(-1, 1) * shakeAmt * 0.3; shakeAmt = Math.max(0, shakeAmt - dt * 1.5); }
   camera.lookAt(cam.tx, 0, cam.tz);
@@ -157,7 +169,7 @@ canvas.addEventListener('pointerdown', e => {
   }
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
-  if (ptrs.size === 2) { pinch = { d: ptrDist(), zoom: cam.zoom }; if (down) down.moved = true; return; }
+  if (ptrs.size === 2) { const [p1, p2] = [...ptrs.values()]; pinch = { d: ptrDist(), zoom: cam.zoom, mx: (p1.x + p2.x) / 2, my: (p1.y + p2.y) / 2, pan: camPan.clone() }; if (down) down.moved = true; return; }
   down = { x: e.clientX, y: e.clientY, theta: cam.theta, moved: false, touch: e.pointerType === 'touch' };
 });
 canvas.addEventListener('pointermove', e => {
@@ -168,7 +180,13 @@ canvas.addEventListener('pointermove', e => {
     return;
   }
   if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (pinch && ptrs.size >= 2) { cam.zoom = clamp(pinch.zoom * pinch.d / ptrDist(), 0.45, 1.8); return; }
+  if (pinch && ptrs.size >= 2) {
+    cam.zoom = clamp(pinch.zoom * pinch.d / ptrDist(), 0.45, 2.6);
+    // 双指一起拖动 = 平移视角
+    const [p1, p2] = [...ptrs.values()], mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2, a = camAxes(), k = 0.03 * cam.zoom;
+    camPan.set(pinch.pan.x - a.rx * (mx - pinch.mx) * k + a.fx * (my - pinch.my) * k, 0, pinch.pan.z - a.rz * (mx - pinch.mx) * k + a.fz * (my - pinch.my) * k);
+    return;
+  }
   if (down) {
     const dx = e.clientX - down.x, lim = down.touch ? 12 : 6;
     if (Math.abs(dx) > lim || Math.abs(e.clientY - down.y) > lim) down.moved = true;
@@ -188,13 +206,18 @@ function ptrEnd(e, cancel) {
 }
 canvas.addEventListener('pointerup', e => ptrEnd(e, false));
 canvas.addEventListener('pointercancel', e => ptrEnd(e, true));
-canvas.addEventListener('wheel', e => { e.preventDefault(); cam.zoom = clamp(cam.zoom * (1 + e.deltaY * 0.001), 0.45, 1.8); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); cam.zoom = clamp(cam.zoom * (1 + e.deltaY * 0.001), 0.45, 2.6); }, { passive: false });
+const PAN_KEY = { w: 'f', arrowup: 'f', s: 'b', arrowdown: 'b', a: 'l', arrowleft: 'l', d: 'r', arrowright: 'r' };
+addEventListener('keydown', e => { const k = PAN_KEY[e.key.toLowerCase()]; if (k && G && !G.over && !idle) { panKeys.add(k); e.preventDefault(); } });
+addEventListener('keyup', e => { const k = PAN_KEY[e.key.toLowerCase()]; if (k) panKeys.delete(k); });
+addEventListener('blur', () => panKeys.clear());
 addEventListener('keydown', e => {
   if ($('#help').classList.contains('show')) { if (e.key === 'Escape') closeHelp(); return; }
   if (!G || G.over || idle) return;
   if (e.key === 'h' || e.key === 'H' || e.key === '?') { openHelp(); return; }
   if (e.key === 'Escape') setSel(null);
   else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+  else if (e.key === 'c' || e.key === 'C') camPan.set(0, 0, 0);
   else if (e.key === 'q' || e.key === 'Q') cam.theta += 0.35;
   else if (e.key === 'e' || e.key === 'E') cam.theta -= 0.35;
   else if (e.key === '0') setSel(sel === 'demolish' ? null : 'demolish');
@@ -343,6 +366,7 @@ function resetWorld() {
   npcs.forEach(n => raft.remove(n.g)); npcs.length = 0; cats.forEach(c => raft.remove(c.g)); cats.length = 0;
   if (mount.g) { mount.g.remove(rider); scene.remove(mount.g); } mount.g = null; mount.kind = null; mount.launched = false; avatar.visible = true; jumpT = 0;
   cannonballs.forEach(b => scene.remove(b.m)); cannonballs.length = 0; bsay.left = 0;
+  camPan.set(0, 0, 0); panKeys.clear();
   playerHook = null; sel = null; barSig = upSig = resSig = ''; spawnTimer = 0; autoTimer = 3;
 }
 function begin() {

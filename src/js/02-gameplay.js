@@ -196,6 +196,7 @@ function updateSharks(dt) {
     // 肌肉佬 / 收租船 / 战舰走 05-boss.js 里的专属行为
     if (s.kind) {
       BOSS_AI[s.kind](s, dt); if (G.over) return;
+      if (s.gone) { scene.remove(s.g); sharks.splice(i, 1); continue; }
       s.flash = Math.max(0, s.flash - dt); s.bodyMat.emissiveIntensity = s.flash > 0 ? 0.6 : 0;
       continue;
     }
@@ -298,7 +299,7 @@ function playerThrow(p) {
   if (len < 0.8) return;
   if (len > 15) dir.multiplyScalar(15 / len);
   const to = new THREE.Vector3(t.x + dir.x, 0, t.z + dir.z);
-  const dn = dir.clone().normalize(); avatarTo.set(t.x + dn.x * 0.32, 0, t.z + dn.z * 0.32); avatar.rotation.y = Math.atan2(dir.x, dir.z);
+  const dn = dir.clone().normalize(); avatarTo.set(t.x + dn.x * 0.32, 0, t.z + dn.z * 0.32); avatar.rotation.y = Math.atan2(dir.x, dir.z); camPan.set(0, 0, 0);
   playerHook = throwHook(from, to, { player: true, dur: 0.38 }); sfx('throw');
 }
 function playerSpear(s) {
@@ -492,12 +493,12 @@ function updateCats(dt) {
 
 // ---------- 坐骑 ----------
 const MOUNT = {
-  tub:    { name: '红色澡盆', speed: 4.5, radius: 2.2, up: '', upSub: '' },
-  jetski: { name: '摩托艇',   speed: 8,   radius: 2.8, up: '换上摩托艇了！', upSub: '再也不用划澡盆了' },
-  yacht:  { name: '豪华游艇', speed: 11,  radius: 3.6, up: '别人开游艇，现在你也开上了！', upSub: '点远处海面，开游艇去扫货' },
+  tub:    { name: '红色澡盆', speed: 6, radius: 2.4, up: '', upSub: '' },
+  jetski: { name: '摩托艇',   speed: 9.5, radius: 3, up: '换上摩托艇了！', upSub: '再也不用划澡盆了' },
+  yacht:  { name: '豪华游艇', speed: 13,  radius: 3.6, up: '别人开游艇，现在你也开上了！', upSub: '点远处海面，开游艇去扫货' },
 };
 const rider = makeFeiqiang(); rider.visible = false;
-const mount = { kind: null, g: null, state: 'dock', pos: new THREE.Vector3(), to: new THREE.Vector3(), launched: false };
+const mount = { kind: null, g: null, state: 'dock', pos: new THREE.Vector3(), to: new THREE.Vector3(), launched: false, chase: null, extra: 0 };
 function setMount() {
   const kind = !G || G.tier < 2 ? 'tub' : G.tier < 4 ? 'jetski' : 'yacht';
   if (mount.kind === kind) return;
@@ -506,12 +507,24 @@ function setMount() {
   rider.position.set(0, mount.g.userData.seat, kind === 'tub' ? 0 : -0.15);
   scene.add(mount.g); mount.state = 'dock'; rider.visible = false; avatar.visible = true;
 }
-function dockPos() { return new THREE.Vector3(raftC.x, 0, raftC.z - raftR - (mount.kind === 'yacht' ? 1.6 : 0.9)); }
+// 停靠点：木筏北侧最靠外、又离中心最近的那块地板，往外挪一格
+function dockPos() {
+  let best = null, bs = 1e9;
+  tiles.forEach(t => { if (tiles.has(key(t.x, t.z - 1))) return; const sc = t.z * 10 + Math.abs(t.x - raftC.x); if (sc < bs) { bs = sc; best = t; } });
+  const off = mount.kind === 'yacht' ? 1.7 : 1.0;
+  return best ? new THREE.Vector3(best.x, 0, best.z - off) : new THREE.Vector3(raftC.x, 0, raftC.z - raftR - off);
+}
+function nearestDebris(p, r) {
+  let best = null, bd = r * r;
+  debris.forEach(d => { if (d.attached || d.reserved) return; const dd = (d.x - p.x) ** 2 + (d.z - p.z) ** 2; if (dd < bd) { bd = dd; best = d; } });
+  return best;
+}
 function rideTo(p) {
   if (mount.state !== 'dock' || playerHook) return;
   const from = dockPos(), dir = new THREE.Vector3(p.x - from.x, 0, p.z - from.z);
   if (dir.length() > 32) dir.setLength(32);
   mount.to.copy(from).add(dir); mount.state = 'out';
+  mount.chase = nearestDebris(p, 5); mount.extra = 2; camPan.set(0, 0, 0);
   avatar.visible = false; rider.visible = true; sfx('throw');
   if (!mount.launched) { mount.launched = true; banner('疯狂水世界，启动！', '肥强跳进' + MOUNT[mount.kind].name + '出海了'); }
   qsayKey('ride', 6, mount.kind === 'tub' ? ['划起来！', '红澡盆，启动！'] : mount.kind === 'jetski' ? ['再也不用划澡盆了！'] : ['别人开游艇，我也开游艇！'], true);
@@ -521,10 +534,17 @@ function updateMount(dt) {
   const m = MOUNT[mount.kind];
   if (mount.state === 'dock') mount.pos.lerp(dockPos(), Math.min(1, dt * 3));
   else {
-    const target = mount.state === 'out' ? mount.to : dockPos(), d = target.clone().sub(mount.pos); d.y = 0;
+    // 追着目标漂浮物跑（带一点提前量）；目标被捞走后，附近还有就再追，最多追 3 个
+    if (mount.state === 'out' && mount.chase && (mount.chase.attached || mount.chase.reserved || !debris.includes(mount.chase))) {
+      mount.chase = mount.extra-- > 0 ? nearestDebris(mount.pos, 7) : null;
+      if (!mount.chase) mount.state = 'back';
+    }
+    if (mount.state === 'out' && Math.hypot(mount.pos.x - raftC.x, mount.pos.z - raftC.z) > raftR + 36) mount.state = 'back';
+    const ch = mount.chase, target = mount.state === 'out' ? (ch ? new THREE.Vector3(ch.x + ch.vx * 0.4, 0, ch.z + ch.vz * 0.4) : mount.to) : dockPos();
+    const d = target.clone().sub(mount.pos); d.y = 0;
     const len = d.length();
-    if (len < 0.3) {
-      if (mount.state === 'out') mount.state = 'back';
+    if (len < 0.3 && !(mount.state === 'out' && ch)) {
+      if (mount.state === 'out') { mount.chase = mount.extra-- > 0 ? nearestDebris(mount.pos, 6) : null; if (!mount.chase) mount.state = 'back'; }
       else { mount.state = 'dock'; avatar.visible = true; rider.visible = false; }
     } else {
       mount.pos.addScaledVector(d.normalize(), Math.min(len, m.speed * dt));

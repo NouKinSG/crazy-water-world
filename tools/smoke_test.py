@@ -32,6 +32,15 @@ A.newGame('filter'); const G=A.G; G.res.wood=G.res.plastic=G.res.scrap=999;
 for(let k=0;k<40;k++) step(0.05);
 A.onClickWorld({x:A.raftC.x+22,z:A.raftC.z+3}); for(let k=0;k<400;k++) step(0.05);
 log.push('坐骑回港='+(A.mount.state==='dock'));
+// 不规则木筏：停靠点要挨着真实地板；木筏边上的浪要比远处小；点远处漂浮物，坐骑要追到手
+A.setSel('floor'); for(const [x,z] of [[2,0],[3,0],[4,0],[4,1],[4,2],[-1,1],[-2,1],[-3,1]]) A.tryPlace(x,z); A.setSel(null); A.recount();
+const dp=dockPos(); const nearTile=[...A.tiles.values()].some(t=>Math.hypot(t.x-dp.x,t.z-dp.z)<1.3);
+let calm=0, rough=0; for(let k=0;k<40;k++){ const tt=k*0.37; calm=Math.max(calm,Math.abs(waveH(A.raftC.x+raftR*0.9,A.raftC.z,tt))); rough=Math.max(rough,Math.abs(waveH(A.raftC.x+raftR+12,A.raftC.z,tt))); }
+for(let k=0;k<200;k++) step(0.05);
+const dd=A.spawnDebris('barrel',0); dd.x=A.raftC.x+20; dd.z=A.raftC.z+3; const c0=G.caught; A.onClickWorld({x:dd.x,z:dd.z}); for(let k=0;k<400;k++) step(0.05);
+log.push('停靠贴地板='+nearTile+' 近处浪/远处浪='+calm.toFixed(2)+'/'+rough.toFixed(2)+' 坐骑追到='+(G.caught>c0)+' 回港='+(A.mount.state==='dock'));
+// 王总：收满就走
+{ const b=spawnBossForDay(10); b.state='anchor'; b.timer=0; for(let k=0;k<1400;k++){ step(0.05); G.res.wood=G.res.plastic=G.res.scrap=999; if(!sharks.includes(b)) break; } log.push('王总收满走人='+!sharks.includes(b)+' 共收='+(b.taken||0)); }
 // 鼠标：左键按下即甩钩、拖动不转视角；右键拖动转视角；右键单击取消建造；Q 键转视角
 const cv=document.querySelector('canvas'), pe=(t,b,x,y)=>cv.dispatchEvent(new PointerEvent(t,{pointerId:1,button:b,clientX:x,clientY:y,pointerType:'mouse',bubbles:true}));
 const th0=cam.theta, hk0=A.hooks.length; pe('pointerdown',0,innerWidth*0.7,innerHeight*0.5); pe('pointermove',-1,innerWidth*0.7+80,innerHeight*0.5); pe('pointerup',0,innerWidth*0.7+80,innerHeight*0.5);

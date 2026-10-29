@@ -179,7 +179,10 @@ const ocean = new THREE.Mesh(oceanGeo, oceanMat);
 ocean.receiveShadow = true; ocean.frustumCulled = false;
 scene.add(ocean);
 function waveH(x, z, t) {
-  return 0.18 * Math.sin(x * 0.35 + t * 1.1) + 0.14 * Math.sin(z * 0.42 - t * 0.9) + 0.08 * Math.sin((x + z) * 0.8 + t * 1.7);
+  const w = 0.18 * Math.sin(x * 0.35 + t * 1.1) + 0.14 * Math.sin(z * 0.42 - t * 0.9) + 0.08 * Math.sin((x + z) * 0.8 + t * 1.7);
+  // 木筏周围风平浪静：离木筏边缘 4 格以内浪逐渐变小，木筏再大也不会被海水漫过
+  const k = clamp((Math.hypot(x - raftC.x, z - raftC.z) - raftR - 0.5) / 4, 0, 1);
+  return w * (0.12 + 0.88 * k * k * (3 - 2 * k));
 }
 function updateOcean(t, cx, cz) {
   ocean.position.x = Math.round(cx / CELL) * CELL;
