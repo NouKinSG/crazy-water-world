@@ -361,8 +361,10 @@ function updateLighting() {
   WINDOW_MATS.forEach(m => m.emissiveIntensity = nk * 1.1); GLOW.lantern.emissiveIntensity = 0.3 + nk; GLOW.coal.emissiveIntensity = 0.9 + nk * 0.6;
   GLOW.water.emissiveIntensity = 0.25 + nk * 0.7; GLOW.eel.emissiveIntensity = 0.6 + nk * 0.9; GLOW.laser.emissiveIntensity = 0.8 + nk * 0.8;
   LH_BEAM_MAT.opacity = nk * 0.09;
-  for (const c in POOL_MATS) POOL_MATS[c].opacity = nk * (G && G.tier >= 4 ? 0.18 : 0.3);   // 豪宅区白地板本身反光强，光斑减弱
-  updateLamps(nk);
+  // 豪宅区本身有窗灯和发光地板，再加光斑和点光源会过曝，只给前面几个阶段补光
+  const lampK = G && G.tier >= 4 ? 0 : nk;
+  for (const c in POOL_MATS) POOL_MATS[c].opacity = lampK * 0.3;
+  updateLamps(lampK);
   if (G && G.tier >= 4) tiles.forEach(t => t.floor.material.emissiveIntensity = nk * 0.9);
 }
 
