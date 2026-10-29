@@ -448,11 +448,20 @@ addEventListener('beforeunload', save);
 // ================= 主循环 =================
 let idle = false, jumpT = 0;
 let last = performance.now();
+// 限帧：游戏中最多 60 帧（高刷屏不跑 120），暂停/开始界面 15 帧；持续低于 25 帧就降分辨率
+let prNow = PR_MAX, slow = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const lazy = (idle || paused) && !CS.active;
+  const gap = now - last;
+  if (gap < (lazy ? 1000 / 15 : 1000 / 60) - 2) return;
+  const dt = Math.min(0.05, gap / 1000); last = now;
   step(dt);
   renderer.render(scene, camera);
+  if (!lazy) {
+    slow = gap > 40 ? slow + dt : Math.max(0, slow - dt * 0.5);
+    if (slow > 3 && prNow > 0.76) { prNow = Math.max(0.75, prNow - 0.25); renderer.setPixelRatio(prNow); renderer.setSize(innerWidth, innerHeight); slow = 0; }
+  }
 }
 function step(dt) {
   T += dt;

@@ -131,10 +131,12 @@ function blip(freq, vol = 0.03, type = 'triangle', lp = 1600) { tone(freq * rand
 
 // ================= 场景 =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.5 : 2));
+// 省电：像素密度封顶（Retina 屏按 2 倍画太费电），掉帧时主循环还会再往下降
+const PR_MAX = Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.25 : 1.5);
+renderer.setPixelRatio(PR_MAX);
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = IS_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 $('#app').appendChild(renderer.domElement);
 const canvas = renderer.domElement;
 
@@ -149,7 +151,7 @@ const hemi = new THREE.HemisphereLight(0xdff3ff, 0x1d5570, 0.85);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1d6, 1.15);
 sun.castShadow = true;
-sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
+sun.shadow.mapSize.set(IS_TOUCH ? 512 : 1024, IS_TOUCH ? 512 : 1024);
 Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 90 });
 sun.shadow.bias = -0.0006;
 scene.add(sun, sun.target);
@@ -279,7 +281,8 @@ function addLightPool(g, type) {
 }
 const LH_SEA_R = 7;
 const SEA_POOL_MAT = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, map: TEX.pool, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-const LAMPS = [0, 1, 2, 3].map(() => { const l = new THREE.PointLight(0xffd27a, 0, 6, 1.6); scene.add(l); return l; });
+// 点光源每盏都会让所有物体多算一遍光照：电脑 2 盏，手机不开
+const LAMPS = (IS_TOUCH ? [] : [0, 1]).map(() => { const l = new THREE.PointLight(0xffd27a, 0, 6, 1.6); scene.add(l); return l; });
 const NET_MAT = new THREE.MeshStandardMaterial({ map: TEX.net, transparent: true, side: THREE.DoubleSide, alphaTest: 0.3 });
 const GHOST_OK = new THREE.MeshBasicMaterial({ color: 0x7cdb8a, transparent: true, opacity: 0.45, depthWrite: false });
 const GHOST_NO = new THREE.MeshBasicMaterial({ color: 0xff5252, transparent: true, opacity: 0.35, depthWrite: false });
