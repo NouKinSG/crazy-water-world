@@ -35,7 +35,7 @@ function paintTile(t) {
 function reskin() { tiles.forEach(t => { t.floor.material.dispose(); t.floor.material = floorMat(); t.hp = tileMaxHp(); paintTile(t); }); }
 function placeBuilding(t, type, v, free) {
   if (v == null) v = randi(0, 999);
-  const g = BUILDERS[type](v); g.position.y = 0.3; g.rotation.y = type === 'net' ? 0 : (v % 4) * Math.PI / 2;
+  const g = BUILDERS[type](v); g.position.y = 0.3; g.rotation.y = type === 'net' ? 0 : (v % 4) * Math.PI / 2; addLightPool(g, type);
   t.g.add(g); t.b = { type, g, v, free: !!free, cd: rand(0, 1), head: g.userData.head, spin: g.userData.spin, spin2: g.userData.spin2 };
 }
 function removeBuilding(t) { t.g.remove(t.b.g); t.b = null; }

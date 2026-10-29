@@ -511,6 +511,26 @@ const GLOW = {
 };
 const WINDOW_MATS = [GLOW.window, GLOW.window2, GLOW.window3, GLOW.window4];
 const BEAM_MAT = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+// ---------- 夜间照明：建筑脚下的光斑（加法混合贴地圆片，白天透明）+ 几盏跟着镜头分配的真点光源 ----------
+TEX.pool = canvasTex(64, (g, s) => {
+  const r = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.35, 'rgba(255,255,255,.55)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0, 0, s, s);
+});
+// 类型 → [光色, 光斑半径, 点光源强度]；收集网和种植箱不发光
+const LIGHT_SPEC = {
+  urine: [0xd9ff6b, 0.9, 0.5], filter: [0x6fd3ff, 1.1, 0.6], grill: [0xff8a3d, 1.5, 1.1], turret: [0xffd27a, 1.0, 0.5],
+  house: [0xffc56b, 1.7, 1.0], windmill: [0xa6ff3d, 1.8, 1.0], laser: [0xff4d4d, 1.5, 0.8], purifier: [0x5ad1ff, 1.9, 1.0],
+  tower: [0xffd27a, 2.4, 1.3], lighthouse: [0xfff2b0, 3.8, 1.8],
+};
+const POOL_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), POOL_MATS = {};
+function addLightPool(g, type) {
+  const spec = LIGHT_SPEC[type]; if (!spec) return;
+  const m = POOL_MATS[spec[0]] || (POOL_MATS[spec[0]] = new THREE.MeshBasicMaterial({ color: spec[0], map: TEX.pool, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  const p = new THREE.Mesh(POOL_GEO, m); p.scale.setScalar(spec[1] * 2); p.position.y = 0.02; p.renderOrder = 1; g.add(p);
+}
+const LAMPS = [0, 1, 2, 3].map(() => { const l = new THREE.PointLight(0xffd27a, 0, 6, 1.6); scene.add(l); return l; });
 const LH_BEAM_MAT = new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0, fog: false, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 const NET_MAT = new THREE.MeshStandardMaterial({ map: TEX.net, transparent: true, side: THREE.DoubleSide, alphaTest: 0.3 });
 const GHOST_OK = new THREE.MeshBasicMaterial({ color: 0x7cdb8a, transparent: true, opacity: 0.45, depthWrite: false });
@@ -590,7 +610,8 @@ const BUILDERS = {
     const tip = mesh(GEO.spear, mat(0xffc53d), 0.62, 0, 0); tip.rotation.z = -Math.PI / 2;
     const head = grp(mesh(new THREE.BoxGeometry(0.32, 0.22, 0.32), mat(0x607d8b), 0, 0, 0), barrel, tip);
     head.position.y = 0.45;
-    const g = grp(mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.32, 8), mat(0x455a64), 0, 0.16, 0), head);
+    const g = grp(mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.32, 8), mat(0x455a64), 0, 0.16, 0), head,
+      mesh(new THREE.BoxGeometry(0.1, 0.06, 0.02), GLOW.lantern, 0, 0.2, 0.32));
     g.userData.head = head; return g;
   },
   house(v = 0) {
@@ -642,7 +663,8 @@ const BUILDERS = {
       mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.8, 10), GLOW.water, -0.22, 0.4, -0.22),
       mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.8, 10), GLOW.water, 0.22, 0.4, -0.22),
       mesh(new THREE.BoxGeometry(0.86, 0.06, 0.5), mat(0x2f80c9), 0, 0.53, 0.18),
-      mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 6), mat(0x90a4ae), 0.3, 0.75, 0.25));
+      mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 6), mat(0x90a4ae), 0.3, 0.75, 0.25),
+      mesh(new THREE.SphereGeometry(0.07, 8, 6), GLOW.lantern, 0.3, 1.03, 0.25));
   },
   tower(v = 0) {
     const style = v % 5, wm = WINDOW_MATS[Math.floor(v / 5) % WINDOW_MATS.length], h = 1.7 + ((v * 37) % 100) / 100 * 2.1;
@@ -669,6 +691,10 @@ const BUILDERS = {
       mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.5, 10), mat(0xf5f5f5), 0, 1.65, 0),
       mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.26, 10), GLOW.lantern, 0, 2.03, 0),
       mesh(new THREE.ConeGeometry(0.22, 0.25, 10), mat(0xe53935), 0, 2.3, 0));
+    // 旋转的探照光束：两道对向的扁锥，晚上才看得见
+    const beam = new THREE.Group(); beam.position.y = 2.03;
+    [1, -1].forEach(d => { const c = new THREE.Mesh(new THREE.ConeGeometry(0.9, 9, 16, 1, true), LH_BEAM_MAT); c.rotation.z = d * Math.PI / 2; c.position.x = -d * 4.5; c.scale.z = 0.35; beam.add(c); });
+    g.add(beam); g.userData.spin2 = beam;
     return g;
   },
 };
@@ -944,7 +970,7 @@ function paintTile(t) {
 function reskin() { tiles.forEach(t => { t.floor.material.dispose(); t.floor.material = floorMat(); t.hp = tileMaxHp(); paintTile(t); }); }
 function placeBuilding(t, type, v, free) {
   if (v == null) v = randi(0, 999);
-  const g = BUILDERS[type](v); g.position.y = 0.3; g.rotation.y = type === 'net' ? 0 : (v % 4) * Math.PI / 2;
+  const g = BUILDERS[type](v); g.position.y = 0.3; g.rotation.y = type === 'net' ? 0 : (v % 4) * Math.PI / 2; addLightPool(g, type);
   t.g.add(g); t.b = { type, g, v, free: !!free, cd: rand(0, 1), head: g.userData.head, spin: g.userData.spin, spin2: g.userData.spin2 };
 }
 function removeBuilding(t) { t.g.remove(t.b.g); t.b = null; }
@@ -1831,6 +1857,20 @@ function updateWeather(dt) {
   }
   updateRain(dt, wRain, cam.tx, cam.tz);
 }
+// 4 盏点光源分给离镜头最近、最亮的发光建筑（数量固定，不会触发着色器重编译）
+const _lampPos = new THREE.Vector3();
+function updateLamps(nk) {
+  const lit = [];
+  if (nk > 0.05 && G) tiles.forEach(t => { const sp = t.b && LIGHT_SPEC[t.b.type];
+    if (sp) lit.push({ t, sp, d: Math.hypot(t.x - cam.tx, t.z - cam.tz) - sp[2] * 3 }); });
+  lit.sort((a, b) => a.d - b.d);
+  LAMPS.forEach((l, i) => {
+    const o = lit[i];
+    if (!o) { l.intensity = 0; return; }
+    l.color.setHex(o.sp[0]); l.intensity = nk * o.sp[2] * 0.6; l.distance = o.sp[1] * 3.2;
+    l.position.copy(_lampPos.set(o.t.x, raft.position.y + 1.4, o.t.z));
+  });
+}
 function updateLighting() {
   const p = G ? (G.t % DAY_LEN) / DAY_LEN : 0.2, k = daylight(p), dusk = Math.max(0, 1 - Math.abs(p - 0.68) / 0.1);
   _c.copy(SKY_DAY).lerp(SKY_STORM, wStorm * 0.85);
@@ -1843,7 +1883,10 @@ function updateLighting() {
   oceanMat.color.copy(OCEAN_NIGHT).lerp(_c, k);
   const nk = 1 - k;
   WINDOW_MATS.forEach(m => m.emissiveIntensity = nk * 1.1); GLOW.lantern.emissiveIntensity = 0.3 + nk; GLOW.coal.emissiveIntensity = 0.9 + nk * 0.6;
-  LH_BEAM_MAT.opacity = nk * 0.07;
+  GLOW.water.emissiveIntensity = 0.25 + nk * 0.7; GLOW.eel.emissiveIntensity = 0.6 + nk * 0.9; GLOW.laser.emissiveIntensity = 0.8 + nk * 0.8;
+  LH_BEAM_MAT.opacity = nk * 0.09;
+  for (const c in POOL_MATS) POOL_MATS[c].opacity = nk * (G && G.tier >= 4 ? 0.18 : 0.3);   // 豪宅区白地板本身反光强，光斑减弱
+  updateLamps(nk);
   if (G && G.tier >= 4) tiles.forEach(t => t.floor.material.emissiveIntensity = nk * 0.9);
 }
 
